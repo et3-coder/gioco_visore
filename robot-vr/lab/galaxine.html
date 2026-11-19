@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Galaxine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="common.css">
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<script type="module">
+import { THREE, RoundedBoxGeometry, M, mesh, canvasTex, roundRect, Bubble, makeArm, hand, speak, clamp, lerp, seg, toward, FONT, startLab, rimshot } from './common.js';
+
+/* GALAXINE — sta sospesa e si muove con l'aria compressa.
+   Le gambe sono pistoni che escono da sotto solo per atterrare.
+   Funzioni: aiuta nei momenti difficili, chiama e messaggia, schermo,
+   riconoscimento facciale, barzellette. */
+const JOKES = [
+  ['Perché il computer ha sempre freddo?', 'Perché lascia le finestre aperte!'],
+  ['Cosa mangia un robot a merenda?', 'Pane e... microchip!'],
+  ['Qual è il colmo per un robot?', 'Avere i nervi d’acciaio!'],
+  ['Perché il robot è andato dal dottore?', 'Perché aveva un virus!'],
+  ['Come si salutano due robot?', 'Bip bip... ciao ciao!'],
+];
+const HOVER = 0.45;      // altezza di volo (m)
+const TORSO_Y = 0.52;    // dove inizia il corpo quando è appoggiata
+const LEG_STEP = 0.13;   // quanto esce ogni tubo del pistone
+
+class Galaxine {
+  constructor(base, lab) {
+    this.lab = lab; this.color = '#3d6dff'; this.pitch = 1.15;
+    this.root = new THREE.Group(); base.add(this.root);
+    this.body = new THREE.Group(); this.root.add(this.body);
+    const white = M(0xf5f7ff, { roughness: .3 }), blue = M(0x3d6dff), navy = M(0x1b2a6b), joint = M(0x9fb2e8, { metalness: .5 });
+    const steel = M(0xd5dbe6, { metalness: .8, roughness: .25 });
+
+    // corpo con schermo
+    this.torso = new THREE.Group(); this.torso.position.y = TORSO_Y; this.body.add(this.torso);
+    this.bodyMat = M(0xf5f7ff, { roughness: .3 });
+    mesh(new RoundedBoxGeometry(0.48, 0.56, 0.3, 4, 0.08), this.bodyMat, this.torso, [0, 0.31, 0]);
+    mesh(new RoundedBoxGeometry(0.4, 0.4, 0.02, 3, 0.03), navy, this.torso, [0, 0.32, 0.142]);
+    this.screen = canvasTex(512, 512);
+    const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.36), new THREE.MeshBasicMaterial({ map: this.screen.tex }));
+    scr.position.set(0, 0.32, 0.156); this.torso.add(scr);
+    mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.14, 10), joint, this.torso, [0, 0.64, 0]);
+    // piastra sotto con gli ugelli dell'aria compressa
+    mesh(new RoundedBoxGeometry(0.42, 0.04, 0.26, 2, 0.015), navy, this.torso, [0, 0.03, 0]);
+    this.nozzleGlow = new THREE.MeshBasicMaterial({ color: 0x7fe0ff, transparent: true, opacity: 0.9 });
+    this.nozzles = [[-0.16, -0.08], [0.16, -0.08], [-0.16, 0.08], [0.16, 0.08]].map(([x, z]) => {
+      const n = new THREE.Group(); n.position.set(x, 0.0, z); this.torso.add(n);
+      mesh(new THREE.CylinderGeometry(0.022, 0.04, 0.05, 16, 1, true), steel, n, [0, -0.015, 0]).material.side = THREE.DoubleSide;
+      const glow = new THREE.Mesh(new THREE.CircleGeometry(0.03, 16), this.nozzleGlow);
+      glow.rotation.x = Math.PI / 2; glow.position.y = -0.03; n.add(glow);
+      return n;
+    });
+
+    // gambe a pistone: manicotto + 3 tubi telescopici con anelli + piedino
+    this.legs = [-1, 1].map(s => {
+      const g = new THREE.Group(); g.position.set(s * 0.09, 0.02, 0); this.torso.add(g);
+      mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.1, 16), navy, g, [0, -0.03, 0]);
+      const rods = [0, 1, 2].map(i => {
+        const r = 0.04 - i * 0.008, rod = new THREE.Group(); g.add(rod);
+        mesh(new THREE.CylinderGeometry(r, r, 0.16, 14), steel, rod, [0, 0.08, 0]);
+        mesh(new THREE.TorusGeometry(r + 0.004, 0.009, 8, 20), i % 2 ? white : blue, rod, [0, 0.01, 0], [Math.PI / 2, 0, 0]);
+        return rod;
+      });
+      const foot = mesh(new THREE.SphereGeometry(0.06, 18, 12), navy, g); foot.scale.set(1, .5, 1.3);
+      return { rods, foot };
+    });
+
+    // testa tonda con due occhi ovali blu
+    this.head = new THREE.Group(); this.head.position.y = 0.86; this.torso.add(this.head);
+    mesh(new THREE.SphereGeometry(0.17, 32, 24), white, this.head).scale.set(1.15, 0.9, 1);
+    this.eyeMat = new THREE.MeshStandardMaterial({ color: 0x1f3fd0, emissive: 0x0a1a80, emissiveIntensity: .6, roughness: .2 });
+    this.eyes = [-1, 1].map(s => {
+      const e = mesh(new THREE.SphereGeometry(0.03, 16, 12), this.eyeMat, this.head, [s * 0.065, 0.02, 0.15]);
+      e.scale.set(0.8, 1.5, 0.5); return e;
+    });
+    mesh(new THREE.SphereGeometry(0.02, 12, 8), blue, this.head, [0, 0.16, 0]);
+    mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.08, 6), joint, this.head, [0, 0.2, 0]);
+    this.antenna = mesh(new THREE.SphereGeometry(0.022, 12, 8), new THREE.MeshStandardMaterial({ color: 0x7fe0ff, emissive: 0x3fb0ff, emissiveIntensity: 1 }), this.head, [0, 0.25, 0]);
+
+    // braccia con mano
+    this.arms = {
+      l: makeArm(this.torso, -1, [-0.27, 0.5, 0], white, blue, 0.22, 0.2, 0.03, hand(navy)),
+      r: makeArm(this.torso, 1, [0.27, 0.5, 0], white, blue, 0.22, 0.2, 0.03, hand(navy)),
+    };
+
+    // ombra d'aria sul pavimento
+    this.airRing = new THREE.Mesh(new THREE.RingGeometry(0.15, 0.45, 48),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
+    this.airRing.rotation.x = -Math.PI / 2; this.airRing.position.y = 0.035; this.root.add(this.airRing);
+
+    // particelle d'aria (nel mondo, così restano indietro quando si muove)
+    this.puffGeo = new THREE.SphereGeometry(0.03, 8, 6);
+    this.puffs = []; this.emitAcc = 0;
+
+    this.bubble = new Bubble(this.body, 1.72, this.color);
+    // parte in volo, gambe dentro
+    this.airTarget = true; this.h = HOVER; this.legK = 0;
+    this.action = null; this.t = 0; this.joke = 0; this.blinkT = 2; this.screenMode = 'logo';
+    this.tmp = new THREE.Vector3();
+  }
+  // è occupata finché fa un'azione o sta decollando / atterrando
+  isBusy() {
+    if (this.action) return true;
+    return this.airTarget ? (this.h < HOVER - 0.01 || this.legK > 0.01) : (this.legK < 0.99 || this.h > 0.005);
+  }
+  // si muove solo volando: se è a terra prima decolla
+  async beforeMove() {
+    if (!this.airTarget) this.do('decolla');
+    await new Promise(res => { const tick = () => (this.isBusy() && !this.action ? setTimeout(tick, 50) : res()); tick(); });
+  }
+  get actions() {
+    return [
+      ['ciao', '👋 Saluta'], ['barzelletta', '😂 Barzelletta'], ['volto', '🙂 Riconosce il volto'],
+      ['chiama', '📞 Chiama e scrive'], ['aiuto', '💙 Momento difficile'], ['vola', '💨 Vola con l’aria'],
+      ['atterra', '🦵 Atterra'], ['decolla', '🚀 Decolla'],
+    ];
+  }
+  say(txt, s) { this.bubble.say(txt, s); speak(txt, this.pitch); }
+  do(a) {
+    // atterra / decolla cambiano solo lo stato di volo
+    if (a === 'atterra') {
+      if (!this.airTarget) return this.say('Sono già appoggiata a terra!', 3);
+      this.airTarget = false; return this.say('Atterraggio! Fuori le gambe a pistone.', 3.5);
+    }
+    if (a === 'decolla') {
+      if (this.airTarget) return this.say('Sto già volando con l’aria compressa!', 3);
+      this.airTarget = true; return this.say('Aria compressa al massimo... decollo!', 3.5);
+    }
+    this.action = a; this.t = 0; this.pathT = 0; this.screenMode = 'logo';
+    if (a === 'ciao') { this.say('Ciao! Io sono Galaxine! Volo con l’aria compressa.', 4.5); this.screenMode = 'happy'; }
+    if (a === 'barzelletta') { const [q, r] = JOKES[this.joke++ % JOKES.length]; this.jokeA = r; this.say(q, 3.6); this.screenMode = 'think'; }
+    if (a === 'volto') { this.say('Scansione del volto in corso...', 3); this.screenMode = 'scan'; }
+    if (a === 'chiama') { this.say('Chiamo la mamma!', 3); this.screenMode = 'call'; }
+    if (a === 'aiuto') { this.say('Sei triste? Ci sono io. Respira con me.', 4); this.screenMode = 'heart'; this.lastPhase = 0; }
+    if (a === 'vola') {
+      if (!this.airTarget) { this.airTarget = true; this.say('Prima decollo... poi faccio un giro!', 3.5); }
+      else this.say('Fssss! Mi muovo spingendo l’aria!', 3.5);
+    }
+  }
+  drawScreen(t) {
+    const { g, tex } = this.screen, W = 512, c = W / 2;
+    g.fillStyle = '#0d1640'; g.fillRect(0, 0, W, W);
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineCap = 'round';
+    const face = (mouth, eyes = 'dot') => {
+      g.strokeStyle = g.fillStyle = '#7fe0ff'; g.lineWidth = 18;
+      if (eyes === 'dot') { g.beginPath(); g.arc(c - 80, 200, 26, 0, 7); g.arc(c + 80, 200, 26, 0, 7); g.fill(); }
+      if (eyes === 'happy') { [-80, 80].forEach(dx => { g.beginPath(); g.arc(c + dx, 215, 34, Math.PI * 1.1, Math.PI * 1.9); g.stroke(); }); }
+      g.beginPath();
+      if (mouth === 'smile') { g.arc(c, 290, 90, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke(); }
+      if (mouth === 'laugh') { g.moveTo(c - 110, 300); g.quadraticCurveTo(c, 440, c + 110, 300); g.closePath(); g.fill(); }
+      if (mouth === 'o') { g.arc(c, 340, 30, 0, 7); g.stroke(); }
+    };
+    switch (this.screenMode) {
+      case 'logo': {
+        g.strokeStyle = '#7fe0ff'; g.lineWidth = 12; g.beginPath();
+        for (let a = 0; a < 16; a += 0.1) { const r = 6 + a * 7; const x = c + Math.cos(a + t * 2) * r, y = 200 + Math.sin(a + t * 2) * r; a ? g.lineTo(x, y) : g.moveTo(x, y); }
+        g.stroke();
+        g.fillStyle = '#fff'; g.font = `800 76px ${FONT}`; g.fillText('GALAXINE', c, 410); break;
+      }
+      case 'happy': face('smile', 'happy'); break;
+      case 'think': face('o'); g.fillStyle = '#ffd54a'; g.font = `800 120px ${FONT}`; g.fillText('?', c + 170, 110 + Math.sin(t * 5) * 10); break;
+      case 'laugh': face('laugh', 'happy'); g.fillStyle = '#ffd54a'; g.font = `800 64px ${FONT}`; g.fillText('AH AH!', c, 80 + Math.sin(t * 12) * 8); break;
+      case 'scan': case 'found': {
+        g.strokeStyle = g.fillStyle = '#7fe0ff'; g.lineWidth = 10;
+        g.beginPath(); g.ellipse(c, 250, 110, 140, 0, 0, 7); g.stroke();
+        g.beginPath(); g.arc(c - 42, 225, 14, 0, 7); g.fill(); g.beginPath(); g.arc(c + 42, 225, 14, 0, 7); g.fill();
+        g.beginPath(); g.arc(c, 290, 45, 0.2 * Math.PI, 0.8 * Math.PI); g.stroke();
+        const ok = this.screenMode === 'found';
+        g.strokeStyle = ok ? '#4cff8a' : '#ffd54a'; g.lineWidth = 12;
+        const L = 50, x0 = 110, y0 = 80, x1 = 402, y1 = 420;
+        [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]].forEach(([x, y, sx, sy]) => {
+          g.beginPath(); g.moveTo(x + sx * L, y); g.lineTo(x, y); g.lineTo(x, y + sy * L); g.stroke();
+        });
+        if (!ok) { const y = 90 + ((t * 260) % 320); g.fillStyle = 'rgba(255,213,74,.55)'; g.fillRect(100, y, 312, 10); }
+        else { g.fillStyle = '#4cff8a'; g.font = `800 52px ${FONT}`; g.fillText('TROVATO!', c, 470); }
+        break;
+      }
+      case 'call': {
+        // cornetta disegnata a mano (niente emoji: si vede ovunque)
+        const ring = Math.sin(t * 30) * (Math.sin(t * 3) > 0 ? 0.15 : 0);
+        g.save(); g.translate(c, 220); g.rotate(ring - 0.6);
+        g.fillStyle = '#4cff8a'; roundRect(g, -30, -95, 60, 190, 30); g.fill();
+        roundRect(g, -55, -110, 85, 55, 22); g.fill(); roundRect(g, -55, 55, 85, 55, 22); g.fill();
+        g.restore();
+        g.strokeStyle = '#4cff8a'; g.lineWidth = 10;
+        for (let i = 1; i <= 3; i++) {
+          const k = (t * 1.5 + i / 3) % 1; g.globalAlpha = 1 - k;
+          g.beginPath(); g.arc(c, 220, 120 + k * 110, -0.6, 0.6); g.stroke();
+          g.beginPath(); g.arc(c, 220, 120 + k * 110, Math.PI - 0.6, Math.PI + 0.6); g.stroke();
+        }
+        g.globalAlpha = 1; g.fillStyle = '#fff'; g.font = `600 58px ${FONT}`; g.fillText('Chiamata...', c, 440); break;
+      }
+      case 'msg': {
+        g.fillStyle = '#3d6dff'; roundRect(g, 70, 110, 372, 200, 50); g.fill();
+        g.beginPath(); g.moveTo(130, 300); g.lineTo(110, 370); g.lineTo(200, 305); g.fill();
+        g.fillStyle = '#fff'; g.font = `600 56px ${FONT}`; g.fillText('Arrivo tra', c, 180); g.fillText('poco!', c, 245);
+        g.fillStyle = '#4cff8a'; g.font = `800 56px ${FONT}`; g.fillText('Inviato ✓✓', c, 440); break;
+      }
+      case 'heart': {
+        const breathe = 0.5 - 0.5 * Math.cos(t * Math.PI / 4); // 8 s per respiro
+        const s = 0.75 + breathe * 0.45;
+        g.save(); g.translate(c, 230); g.scale(s, s);
+        g.fillStyle = '#ff5c8a'; g.beginPath(); g.moveTo(0, 60);
+        g.bezierCurveTo(-170, -60, -80, -170, 0, -80); g.bezierCurveTo(80, -170, 170, -60, 0, 60); g.fill(); g.restore();
+        g.fillStyle = '#fff'; g.font = `800 64px ${FONT}`;
+        g.fillText(Math.sin(t * Math.PI / 4) >= 0 ? 'Inspira...' : 'Espira...', c, 440); break;
+      }
+      case 'air': {
+        g.strokeStyle = '#7fe0ff'; g.lineWidth = 14;
+        for (let i = 0; i < 3; i++) {
+          const y = 150 + i * 90, o = (t * 300 + i * 80) % 120;
+          g.beginPath(); g.moveTo(90 - o, y); g.bezierCurveTo(200, y - 40, 300, y + 40, 420 - o, y); g.stroke();
+        }
+        g.fillStyle = '#fff'; g.font = `800 60px ${FONT}`; g.fillText('ARIA: MAX', c, 440); break;
+      }
+    }
+    tex.needsUpdate = true;
+  }
+  emit(dt, thrust) {
+    this.emitAcc += dt * thrust * 70;
+    while (this.emitAcc >= 1) {
+      this.emitAcc -= 1;
+      const n = this.nozzles[Math.floor(Math.random() * 4)];
+      const p = new THREE.Mesh(this.puffGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .55, depthWrite: false }));
+      n.getWorldPosition(p.position); p.position.y -= 0.04;
+      p.userData = { v: new THREE.Vector3((Math.random() - .5) * .3, -1.4 - Math.random() * .6, (Math.random() - .5) * .3), life: 0 };
+      this.lab.scene.add(p); this.puffs.push(p);
+    }
+    this.puffs = this.puffs.filter(p => {
+      const d = p.userData; d.life += dt;
+      p.position.addScaledVector(d.v, dt);
+      if (p.position.y < 0.04) { // l'aria tocca terra e si allarga
+        p.position.y = 0.04;
+        if (d.v.y < 0) { const s = -d.v.y * 0.7, a = Math.random() * Math.PI * 2; d.v.set(Math.cos(a) * s, 0, Math.sin(a) * s); }
+      }
+      p.scale.setScalar(1 + d.life * 4);
+      p.material.opacity = 0.5 * (1 - d.life / 0.9);
+      if (d.life > 0.9) { this.lab.scene.remove(p); p.material.dispose(); return false; }
+      return true;
+    });
+  }
+  update(dt, now) {
+    this.t += dt; const t = this.t, A = this.arms;
+    const idle = Math.sin(now * 1.3);
+    A.l.pose(0.25 + idle * 0.03, -0.25); A.r.pose(0.25 - idle * 0.03, -0.25);
+    this.head.rotation.set(0, 0, idle * 0.04);
+    this.torso.rotation.set(0, 0, 0);
+    this.blinkT -= dt;
+    if (this.blinkT < 0) this.blinkT = 2 + Math.random() * 3;
+    this.eyes.forEach(e => (e.scale.y = this.blinkT < 0.12 ? 0.2 : 1.5));
+    this.bodyMat.emissive.setRGB(0, 0, 0);
+    let flying = false, boost = 0;
+    // spostamenti dai blocchi: scivola nell'aria con i getti al massimo
+    if (this.walking || this.turning) { boost = 1; this.torso.rotation.x = this.walking ? 0.12 : 0; }
+
+    switch (this.action) {
+      case 'ciao': {
+        A.r.pose(2.6, 0.4 + Math.sin(t * 9) * 0.45);
+        this.head.rotation.z = Math.sin(t * 3) * 0.12;
+        if (t > 4.5) { this.action = null; this.screenMode = 'logo'; } break;
+      }
+      case 'barzelletta': {
+        if (t > 3.6 && this.screenMode === 'think') { this.screenMode = 'laugh'; this.say(this.jokeA, 4.5); setTimeout(rimshot, 1400); }
+        if (this.screenMode === 'laugh') {
+          this.torso.rotation.z = Math.sin(t * 20) * 0.04; this.head.rotation.x = -0.2 + Math.sin(t * 18) * 0.06;
+          A.l.pose(0.6, -1.4); A.r.pose(0.6, -1.4);
+        } else { A.r.pose(0.6, -2.2); this.head.rotation.z = 0.2; }
+        if (t > 8.5) { this.action = null; this.screenMode = 'logo'; } break;
+      }
+      case 'volto': {
+        // gira la testa verso chi guarda (la telecamera o il visore)
+        const p = this.lab.viewerPosition(this.tmp); this.torso.worldToLocal(p);
+        const look = seg(t, 0, 0.8);
+        this.head.rotation.y = Math.atan2(p.x, p.z) * look;
+        this.head.rotation.x = -Math.atan2(p.y - this.head.position.y, Math.hypot(p.x, p.z)) * look * 0.7;
+        this.eyeMat.emissiveIntensity = this.screenMode === 'scan' ? 1.2 + Math.sin(t * 15) * 0.6 : 0.6;
+        if (t > 3 && this.screenMode === 'scan') { this.screenMode = 'found'; this.say('Ti ho riconosciuto! Ciao amico, che bello vederti!', 4); }
+        if (t > 7.5) { this.action = null; this.screenMode = 'logo'; this.eyeMat.emissiveIntensity = .6; } break;
+      }
+      case 'chiama': {
+        if (this.screenMode === 'call') A.r.pose(0.9, -2.4); else A.r.pose(0.5, -1.6, -0.6);
+        if (t > 3.2 && this.screenMode === 'call') { this.screenMode = 'msg'; this.say('E ora le scrivo un messaggio. Inviato!', 3.5); }
+        if (t > 7.5) { this.action = null; this.screenMode = 'logo'; } break;
+      }
+      case 'aiuto': {
+        const breathe = 0.5 - 0.5 * Math.cos(t * Math.PI / 4);
+        this.bodyMat.emissive.setRGB(0.25 * breathe, 0.35 * breathe, 0.7 * breathe);
+        // braccia aperte in avanti, come un abbraccio che segue il respiro
+        A.l.pose(0.5 + breathe * 0.5, -0.5 - breathe * 0.3, -1.1); A.r.pose(0.5 + breathe * 0.5, -0.5 - breathe * 0.3, -1.1);
+        this.head.rotation.x = -0.15 * breathe;
+        const phase = Math.floor(t / 4);
+        if (phase !== this.lastPhase && t > 4 && t < 16) { this.lastPhase = phase; this.say(phase % 2 ? 'Espira piano...' : 'Inspira...', 3.8); }
+        if (t > 16.5) { this.action = null; this.screenMode = 'logo'; this.say('Bravo! Va meglio? Io sono sempre qui.', 4); }
+        break;
+      }
+      case 'vola': {
+        // aspetta di essere in quota, poi fa un otto nell'aria
+        if (this.h > HOVER * 0.95 && this.legK < 0.05) this.pathT += dt;
+        const D = 9, k = clamp(this.pathT / D), a = k * Math.PI * 2;
+        if (this.pathT > 0 && k < 1) {
+          flying = true; boost = 1; this.screenMode = 'air';
+          const x = Math.sin(a) * 0.9, z = Math.sin(2 * a) * 0.45;
+          const vx = Math.cos(a) * 0.9, vz = Math.cos(2 * a) * 0.9;
+          this.root.position.set(x, 0, z);
+          this.root.rotation.z = -vx * 0.12; this.root.rotation.x = vz * 0.12;
+          A.l.pose(0.6, -0.2); A.r.pose(0.6, -0.2);
+        }
+        if (k >= 1) { this.action = null; this.screenMode = 'logo'; this.say('Che bel giro! Tutto con l’aria.', 3); }
+        break;
+      }
+    }
+    if (!flying) {
+      this.root.position.lerp(new THREE.Vector3(), 1 - Math.exp(-dt * 4));
+      this.root.rotation.x = lerp(this.root.rotation.x, 0, 1 - Math.exp(-dt * 5));
+      this.root.rotation.z = lerp(this.root.rotation.z, 0, 1 - Math.exp(-dt * 5));
+    }
+
+    // --- volo e atterraggio ---
+    // atterrare: prima escono i pistoni, poi scende piano. Decollare: sale, poi rientrano.
+    if (!this.airTarget) {
+      this.legK = toward(this.legK, 1, dt / 1.0);
+      if (this.legK >= 1) this.h = toward(this.h, 0, dt * 0.3);
+    } else {
+      this.h = toward(this.h, HOVER, dt * (this.h < 0.02 ? 0.15 : 0.35));
+      if (this.h > 0.25) this.legK = toward(this.legK, 0, dt / 1.0);
+    }
+    const inAir = this.h > 0.005;
+    const moving = inAir && Math.abs(this.h - (this.airTarget ? HOVER : 0)) > 0.01;
+    const thrust = !inAir ? 0 : Math.max(boost, moving ? 1 : 0.55);
+    const bob = inAir ? Math.sin(now * 2.2) * 0.025 * clamp(this.h / HOVER) : 0;
+    this.body.position.y = this.h + bob;
+    if (inAir && !flying) this.torso.rotation.z += Math.sin(now * 1.1) * 0.025;
+    // pistoni: ogni tubo esce di LEG_STEP rispetto al precedente
+    const e = this.legK;
+    this.legs.forEach(({ rods, foot }) => {
+      rods.forEach((rod, i) => (rod.position.y = -0.1 - e * LEG_STEP * (i + 1)));
+      foot.position.y = -0.12 - e * LEG_STEP * 3;
+    });
+    // ugelli e aria
+    this.nozzleGlow.opacity = 0.25 + thrust * 0.75;
+    this.nozzleGlow.color.setHSL(0.53, 1, 0.55 + thrust * 0.2);
+    this.airRing.material.opacity = inAir ? thrust * 0.35 * clamp(1 - this.h / 1.5) : 0;
+    this.airRing.scale.setScalar(1 + Math.sin(now * 8) * 0.04);
+    this.emit(dt, thrust);
+
+    this.antenna.material.emissiveIntensity = 0.7 + Math.sin(now * 4) * 0.3;
+    this.drawScreen(t);
+    this.bubble.update(now);
+  }
+}
+
+startLab(Galaxine, {
+  name: 'Galaxine', color: 0x3d6dff,
+  // programma di esempio che si vede aprendo i blocchi
+  program: ['ciao', ['avanti', 2], ['gira', 'sx'], ['avanti', 1], 'atterra', 'barzelletta', 'decolla', ['casa']],
+});
+</script>
+</body>
+</html>

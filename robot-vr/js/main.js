@@ -335,6 +335,17 @@ const game = {
     this.current.start();
   },
 
+  // Laboratorio di Binot e Galaxine: è una pagina a parte (cartella lab/), con la sua programmazione a blocchi.
+  // Nel visore la sessione VR si chiude prima di cambiare pagina; nel laboratorio si rientra con il suo pulsante VR.
+  async openLab() {
+    this.leaveCurrent();
+    const session = renderer.xr.getSession();
+    if (session) {
+      try { await session.end(); } catch (e) { /* già chiusa */ }
+    }
+    window.location.href = 'lab/index.html';
+  },
+
   // Posizione della testa del giocatore nelle coordinate della stanza di gioco
   headLocal() {
     const p = new THREE.Vector3();

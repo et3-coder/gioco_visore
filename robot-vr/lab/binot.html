@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Binot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="common.css">
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<script type="module">
+import { THREE, RoundedBoxGeometry, M, mesh, canvasTex, Bubble, makeArm, claw, speak, clamp, lerp, seg, FONT, startLab,
+  reach, armTip, playDance, stopMusic, pop } from './common.js';
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+/* BINOT — vola, 4 braccia, parla, aiuta, costruisce Lego, 2 telecamere */
+class Binot {
+  constructor(base) {
+    this.color = '#ff7a3d'; this.pitch = 1.5;
+    this.root = new THREE.Group(); base.add(this.root);
+    this.body = new THREE.Group(); this.root.add(this.body);
+    const metal = M(0xc9d1dc, { metalness: .55, roughness: .35 });
+    const orange = M(0xff7a3d), dark = M(0x2a3245), joint = M(0x6d7891, { metalness: .5 });
+
+    // gambe
+    this.legs = [-1, 1].map(s => {
+      const hip = new THREE.Group(); hip.position.set(s * 0.1, 0.56, 0); this.body.add(hip);
+      mesh(new THREE.SphereGeometry(0.045, 16, 12), joint, hip);
+      mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.24, 12), metal, hip, [0, -0.13, 0]);
+      const knee = new THREE.Group(); knee.position.y = -0.26; hip.add(knee);
+      mesh(new THREE.SphereGeometry(0.045, 16, 12), orange, knee);
+      mesh(new THREE.CylinderGeometry(0.032, 0.04, 0.22, 12), metal, knee, [0, -0.12, 0]);
+      mesh(new RoundedBoxGeometry(0.12, 0.05, 0.18, 2, 0.02), dark, knee, [0, -0.255, 0.03]);
+      return { hip, knee };
+    });
+    // busto con la scritta BI NOT
+    mesh(new RoundedBoxGeometry(0.3, 0.42, 0.2, 3, 0.04), metal, this.body, [0, 0.8, 0]);
+    const { g, tex } = canvasTex(256, 256);
+    g.fillStyle = '#fff'; g.fillRect(0, 0, 256, 256);
+    g.fillStyle = '#ff7a3d'; g.font = `800 92px ${FONT}`; g.textAlign = 'center';
+    g.fillText('BI', 128, 100); g.fillText('NOT', 128, 190);
+    g.strokeStyle = '#2a3245'; g.lineWidth = 8; g.beginPath(); g.arc(128, 225, 16, 0, 7); g.stroke();
+    // la targhetta BI NOT è uno sportello: si apre in avanti e da lì escono i Lego
+    mesh(new THREE.PlaneGeometry(0.19, 0.19), new THREE.MeshBasicMaterial({ color: 0x0b1020 }), this.body, [0, 0.82, 0.1005]).castShadow = false;
+    this.hatchGlow = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.15), new THREE.MeshBasicMaterial({ color: 0xffd54a, transparent: true, opacity: 0 }));
+    this.hatchGlow.position.set(0, 0.82, 0.1008); this.body.add(this.hatchGlow);
+    this.hatch = new THREE.Group(); this.hatch.position.set(0, 0.72, 0.102); this.body.add(this.hatch);
+    mesh(new THREE.PlaneGeometry(0.2, 0.2), new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide }), this.hatch, [0, 0.1, 0]);
+    mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.06, 12), joint, this.body, [0, 1.03, 0]);
+
+    // testa (schermo con due occhi)
+    this.head = new THREE.Group(); this.head.position.y = 1.06; this.body.add(this.head);
+    mesh(new RoundedBoxGeometry(0.5, 0.38, 0.34, 4, 0.07), metal, this.head, [0, 0.19, 0]);
+    mesh(new RoundedBoxGeometry(0.4, 0.27, 0.02, 3, 0.04), dark, this.head, [0, 0.19, 0.165]);
+    const white = M(0xffffff, { roughness: .2 }), black = M(0x111111, { roughness: .1 });
+    [-1, 1].forEach(s => {
+      const e = new THREE.Group(); e.position.set(s * 0.09, 0.21, 0.175); this.head.add(e);
+      mesh(new THREE.SphereGeometry(0.05, 20, 16), white, e).scale.z = .4;
+      mesh(new THREE.SphereGeometry(0.027, 16, 12), black, e, [0, 0, 0.015]);
+      mesh(new THREE.SphereGeometry(0.009, 8, 8), white, e, [0.01, 0.01, 0.04]);
+    });
+    mesh(new THREE.TorusGeometry(0.025, 0.006, 8, 16, Math.PI), white, this.head, [0, 0.12, 0.178], [0, 0, Math.PI]).castShadow = false;
+
+    // drone sopra la testa: albero, barra, 3 eliche, 2 telecamere
+    this.drone = new THREE.Group(); this.drone.position.y = 0.38; this.head.add(this.drone);
+    mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.22, 10), joint, this.drone, [0, 0.11, 0]);
+    mesh(new THREE.BoxGeometry(0.62, 0.03, 0.04), joint, this.drone, [0, 0.13, 0]);
+    this.props = [];
+    const blade = M(0x2a3245);
+    this.blur = new THREE.MeshBasicMaterial({ color: 0x8892a8, transparent: true, opacity: 0, depthWrite: false });
+    [[-0.3, 0.17], [0, 0.26], [0.3, 0.17]].forEach(([x, y]) => {
+      if (y < .2) mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.05, 8), joint, this.drone, [x, 0.15, 0]);
+      const p = new THREE.Group(); p.position.set(x, y, 0); this.drone.add(p);
+      mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.03, 12), orange, p);
+      mesh(new THREE.BoxGeometry(0.3, 0.008, 0.045), blade, p, [0, 0.012, 0], [0.18, 0, 0]);
+      mesh(new THREE.BoxGeometry(0.045, 0.008, 0.3), blade, p, [0, 0.012, 0], [0, 0, 0.18]);
+      const d = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.004, 32), this.blur); d.position.y = 0.014; p.add(d);
+      this.props.push(p);
+    });
+    // le "due telecamere" del disegno sono sotto la barra
+    this.cams = [-1, 1].map(s => {
+      const c = new THREE.Group(); c.position.set(s * 0.15, 0.1, 0.02); this.drone.add(c);
+      mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.05, 16), dark, c, [0, 0, 0], [Math.PI / 2, 0, 0]);
+      const lens = mesh(new THREE.CircleGeometry(0.02, 16), new THREE.MeshBasicMaterial({ color: 0x3fd0ff }), c, [0, 0, 0.026]);
+      lens.castShadow = false;
+      return { c, lens };
+    });
+    const beamMat = new THREE.MeshBasicMaterial({ color: 0x3fd0ff, transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+    this.beams = this.cams.map(({ c }) => {
+      const b = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.6, 24, 1, true), beamMat);
+      b.rotation.x = -Math.PI / 2; b.position.z = 0.8; b.visible = false; c.add(b); return b;
+    });
+
+    // 4 braccia: due in alto verso il cielo, due in mezzo (come nel disegno)
+    const arm = (s, y, l1, l2) => makeArm(this.body, s, [s * 0.19, y, 0], metal, orange, l1, l2, 0.025, claw(dark));
+    this.arms = { ul: arm(-1, 0.96, 0.18, 0.17), ur: arm(1, 0.96, 0.18, 0.17), ll: arm(-1, 0.76, 0.2, 0.2), lr: arm(1, 0.76, 0.2, 0.2) };
+
+    this.bubble = new Bubble(this.body, 2.0, this.color);
+    this.bricks = new THREE.Group(); this.root.add(this.bricks);
+    // tavolino davanti a Binot per la torre di Lego
+    this.table = new THREE.Group(); this.table.position.set(0, 0, 0.26); this.table.visible = false; this.root.add(this.table);
+    const wood = M(0xd9a066, { metalness: 0, roughness: .8 });
+    mesh(new RoundedBoxGeometry(0.34, 0.03, 0.22, 2, 0.01), wood, this.table, [0, 0.42, 0]);
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([x, z]) => mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.41, 8), wood, this.table, [x * 0.14, 0.205, z * 0.08]));
+    this.box = null;
+    // posa di partenza per le braccia che "cercano" un punto (cinematica inversa)
+    this.ik = { ll: {}, lr: {}, ul: {}, ur: {} };
+    this.action = null; this.t = 0; this.spin = 0; this.propAngle = 0; this.music = null;
+    this.tmp = new THREE.Vector3();
+  }
+  resetIK(...keys) {
+    const rest = { ll: [1.2, 0.3], lr: [1.2, 0.3], ul: [2.0, 0.7], ur: [2.0, 0.7] };
+    keys.forEach(k => Object.assign(this.ik[k], { r: rest[k][0], b: rest[k][1], w: 0 }));
+  }
+  // punta della pinza in coordinate del robot (root)
+  tipLocal(arm, out) { return this.root.worldToLocal(armTip(arm, out)); }
+  // porta la pinza in un punto dato in coordinate del robot
+  reachLocal(key, p) { reach(this.arms[key], this.root.localToWorld(this.tmp.copy(p)), this.ik[key]); }
+  get actions() {
+    return [
+      ['ciao', '👋 Saluta'], ['vola', '🚁 Vola'], ['lego', '🧱 Costruisce Lego'],
+      ['telecamere', '📷 Due telecamere'], ['aiuta', '🤝 Ti aiuta'], ['danza', '💃 Balla'],
+    ];
+  }
+  say(txt, s) { this.bubble.say(txt, s); speak(txt, this.pitch); }
+  do(a) {
+    this.action = a; this.t = 0;
+    stopMusic(); this.music = null;
+    this.needTips = true; this.placed = -1; this.tada = false; this.resetIK('ll', 'lr', 'ul', 'ur');
+    this.hatch.rotation.x = 0; this.hatchGlow.material.opacity = 0;
+    if (a === 'ciao') this.say('Ciao, sono Binot! Ho 4 braccia e so volare!', 4);
+    if (a === 'vola') this.say('Accendo le eliche... si vola!', 4);
+    if (a === 'telecamere') this.say('Con le mie due telecamere vedo tutto!', 5);
+    if (a === 'aiuta') this.say('Ti aiuto io! Questa scatola la porto io.', 5);
+    if (a === 'danza') { this.bubble.say('♪ Musica! Si balla! ♪', 3); this.music = playDance(4, 128); }
+    if (a === 'lego' || a === 'aiuta') { this.bricks.clear(); this.table.visible = false; }
+    if (a === 'lego') { this.say('Adesso costruisco una torre di Lego!', 4); this.table.visible = true; this.carry = -1; }
+    if (this.box) { this.root.remove(this.box); this.box = null; }
+    if (a === 'aiuta') {
+      this.box = new THREE.Group();
+      mesh(new THREE.BoxGeometry(0.3, 0.22, 0.24), M(0xc9a06b, { metalness: 0, roughness: .9 }), this.box);
+      mesh(new THREE.BoxGeometry(0.31, 0.03, 0.06), M(0xe6cf9f, { metalness: 0 }), this.box, [0, 0.1, 0]);
+      this.box.position.set(0, 0.11, 0.42); this.root.add(this.box);
+      this.resetIK('ll', 'lr', 'ul', 'ur');
+    }
+  }
+  // un nuovo mattoncino nasce dentro il petto (nascosto dallo sportello)
+  addBrick(i) {
+    const colors = [0xe53935, 0x1e88e5, 0xfdd835, 0x43a047, 0xff7a3d, 0x8e24aa];
+    const b = new THREE.Group();
+    const mat = M(colors[i % colors.length], { roughness: .3, metalness: 0 });
+    mesh(new THREE.BoxGeometry(0.12, 0.05, 0.07), mat, b);
+    for (let x = -1; x <= 1; x++) for (let z = -.5; z <= .5; z++)
+      mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.013, 10), mat, b, [x * 0.036, 0.031, z * 0.034]);
+    b.position.set(0, 0.8, 0.0);
+    // posto nella torre, sul tavolino (sfalsati come un muro)
+    b.userData.slot = V(i % 2 ? 0.025 : -0.025, 0.46 + i * 0.052, 0.26);
+    this.bricks.add(b);
+    return b;
+  }
+  update(dt, now) {
+    this.t += dt; const t = this.t, A = this.arms;
+    let lift = 0, spinTarget = 0;
+    const idle = Math.sin(now * 1.6);
+    // posa di riposo
+    A.ul.pose(2.0, 0.7); A.ur.pose(2.0, 0.7);
+    A.ll.pose(1.2 + idle * 0.05, 0.3); A.lr.pose(1.2 - idle * 0.05, 0.3);
+    this.head.rotation.set(0, 0, idle * 0.03); this.body.rotation.set(0, 0, 0);
+    this.legs.forEach(l => { l.hip.rotation.set(0, 0, 0); l.knee.rotation.set(0, 0, 0); });
+    this.beams.forEach(b => (b.visible = false));
+    this.body.position.set(0, 0, 0);
+    // all'inizio di ogni azione: dove sono le pinze a riposo (da lì partono e lì tornano)
+    if (this.needTips) {
+      this.needTips = false; this.root.updateMatrixWorld(true);
+      this.tips = Object.fromEntries(Object.entries(A).map(([k, a]) => [k, this.tipLocal(a, V())]));
+    }
+    // camminata (blocchi "vai avanti / girati"): gambe e braccia a ritmo
+    if ((this.walking || this.turning) && !this.action) {
+      const w = Math.sin(now * 9);
+      this.legs[0].hip.rotation.x = -0.45 * w; this.legs[1].hip.rotation.x = 0.45 * w;
+      this.legs[0].knee.rotation.x = 0.5 * Math.max(0, w); this.legs[1].knee.rotation.x = 0.5 * Math.max(0, -w);
+      this.body.position.y = Math.abs(w) * 0.025;
+      A.ll.pose(1.2, 0.3, 0.4 * w); A.lr.pose(1.2, 0.3, -0.4 * w);
+    }
+
+    switch (this.action) {
+      case 'ciao': {
+        const w = Math.sin(t * 9) * 0.45;
+        A.ur.pose(2.6, -0.5 + w); A.ul.pose(2.6, -0.5 - w);
+        A.lr.pose(1.6 + w * .5, 0.6); A.ll.pose(1.6 - w * .5, 0.6);
+        this.head.rotation.z = Math.sin(t * 4) * 0.12;
+        if (t > 4) this.action = null; break;
+      }
+      case 'vola': {
+        spinTarget = t < 7.5 ? 45 : 0;
+        lift = seg(t, 1.2, 3) * 1.1 - seg(t, 6.2, 8) * 1.1;
+        if (lift > 0.05) {
+          this.body.position.x = Math.sin(t * 0.9) * 0.25 * clamp(lift);
+          this.body.rotation.z = -Math.cos(t * 0.9) * 0.08 * clamp(lift);
+          this.body.rotation.y = Math.sin(t * 0.5) * 0.4;
+          this.legs.forEach((l, i) => { l.hip.rotation.x = Math.sin(t * 3 + i) * 0.25; l.knee.rotation.x = 0.3; });
+          A.ll.pose(1.5, 0.2); A.lr.pose(1.5, 0.2);
+          lift += Math.sin(t * 2.5) * 0.04;
+        }
+        if (t > 3.2 && t - dt <= 3.2) this.bubble.say('Sono in volo! Guardami!', 3);
+        if (t > 9) this.action = null; break;
+      }
+      case 'lego': {
+        // ogni mattoncino: lo sportello si apre, il Lego esce dal petto,
+        // una pinza lo prende, lo porta con un arco sulla torre e torna indietro
+        const C = 1.7, T0 = 0.8, N = 6, tt = t - T0;
+        const i = Math.floor(tt / C), p = tt / C - i;
+        this.head.rotation.x = 0.3;
+        this.table.scale.setScalar(Math.max(0.001, seg(t, 0, 0.5)));
+        if (tt > 0 && i < N) {
+          const key = i % 2 ? 'lr' : 'll', arm = A[key];
+          const b = this.bricks.children[i] || this.addBrick(i);
+          const slot = b.userData.slot, start = this.tips[key];
+          const out = V(0, 0.8, 0.16), grip = V(0, 0.03, 0), above = slot.clone().add(V(0, 0.1, 0));
+          const open = seg(p, 0, 0.12) - seg(p, 0.42, 0.56);
+          this.hatch.rotation.x = 1.6 * open; this.hatchGlow.material.opacity = open * 0.8;
+          let target, carried = false;
+          if (p < 0.25) {            // esce dal petto, la pinza va a prenderlo
+            b.position.lerpVectors(V(0, 0.8, 0), out, seg(p, 0.06, 0.22));
+            target = start.clone().lerp(out.clone().add(grip), seg(p, 0, 0.24));
+          } else if (p < 0.8) {      // lo porta sopra la torre e lo abbassa
+            const k = seg(p, 0.25, 0.68);
+            target = out.clone().lerp(above, k); target.y += Math.sin(k * Math.PI) * 0.1;
+            if (p > 0.68) target = above.clone().lerp(slot, seg(p, 0.68, 0.8));
+            target.add(grip); carried = true;
+          } else {                   // lo incastra e la pinza torna a posto
+            if (this.placed !== i) { this.placed = i; pop(1 + i * 0.12); }
+            b.position.copy(slot);
+            target = slot.clone().add(grip).lerp(start, seg(p, 0.82, 1));
+          }
+          this.root.updateMatrixWorld(true);
+          this.reachLocal(key, target);
+          if (carried) this.tipLocal(arm, b.position).sub(grip);
+          this.head.rotation.y = -b.position.x * 2;
+          // le braccia in alto fanno il tifo quando il pezzo si incastra
+          if (p > 0.8) { const w = Math.sin(t * 18) * 0.25; A.ul.pose(2.4, 0.4 + w); A.ur.pose(2.4, 0.4 - w); }
+        }
+        const end = T0 + N * C;
+        if (t > end) {
+          this.head.rotation.x = 0;
+          const w = Math.sin(t * 9) * 0.4;
+          A.ul.pose(2.7, w); A.ur.pose(2.7, -w); A.ll.pose(1.7, 0.5 + w); A.lr.pose(1.7, 0.5 - w);
+        }
+        if (t > end && t - dt <= end) this.say('Fatto! Ti piace la mia torre?', 4);
+        if (t > end + 2.5) this.action = null; break;
+      }
+      case 'telecamere': {
+        this.beams.forEach(b => (b.visible = true));
+        this.head.rotation.y = Math.sin(t * 1.4) * 0.7;
+        this.head.rotation.x = 0.15 + Math.sin(t * 2.3) * 0.1;
+        this.cams.forEach(({ lens }) => lens.material.color.setHSL(0.53, 1, 0.5 + Math.sin(t * 10) * 0.2));
+        if (t > 5.5) this.action = null; break;
+      }
+      case 'aiuta': {
+        // si inchina, le pinze di sotto afferrano la scatola, la solleva al petto,
+        // le pinze di sopra aiutano a tenerla, poi la rimette giù
+        if (!this.box) { this.action = null; break; }
+        const lift = seg(t, 1.6, 3.2), down = seg(t, 5.6, 7.0), release = seg(t, 7.2, 8.0);
+        const bow = Math.max(seg(t, 0.2, 1.2) * (1 - lift), down * (1 - release));
+        this.body.rotation.x = 0.35 * bow; this.body.position.y = -0.05 * bow;
+        this.legs.forEach(l => { l.hip.rotation.x = -0.35 * bow; l.knee.rotation.x = 0.6 * bow; });
+        const by = lerp(0.17, 0.9, lift * (1 - down));
+        this.box.position.set(0, by, 0.3);
+        this.box.rotation.z = (lift * (1 - down) > 0.99) ? Math.sin(t * 3) * 0.05 : 0;
+        this.root.updateMatrixWorld(true);
+        const hold = seg(t, 0.6, 1.4) * (1 - release);
+        const upHold = seg(t, 2.4, 3.2) * (1 - seg(t, 5.2, 5.8));
+        for (const [key, s, dy, k] of [['ll', -1, -0.06, hold], ['lr', 1, -0.06, hold], ['ul', -1, 0.1, upHold], ['ur', 1, 0.1, upHold]]) {
+          const side = V(s * 0.165, by + dy, 0.3);
+          this.reachLocal(key, this.tips[key].clone().lerp(side, k));
+        }
+        this.head.rotation.x = 0.35 * bow;
+        if (t > 3.4 && t - dt <= 3.4) this.say('Visto? Io sono fortissimo!', 3);
+        if (t > 8.2) this.action = null;
+        break;
+      }
+      case 'danza': {
+        // balla a tempo con la musica: 4 battute, ognuna con un passo diverso
+        const beat = this.music ? this.music.now() : t * 128 / 60;
+        if (beat < 0) break;
+        const bar = Math.floor(beat / 4), bb = beat % 1, s = Math.sin(beat * Math.PI);
+        const bounce = Math.pow(1 - bb, 3);
+        spinTarget = 20;
+        this.body.position.y = bounce * 0.06;
+        const step = Math.floor(beat) % 2;
+        this.legs[step].hip.rotation.x = -0.45 * Math.sin(bb * Math.PI); this.legs[step].knee.rotation.x = 0.8 * Math.sin(bb * Math.PI);
+        if (bar === 0) {        // braccia su e giù, testa a ritmo
+          A.ul.pose(2.5 + 0.4 * s, -0.4 * s); A.ur.pose(2.5 - 0.4 * s, 0.4 * s);
+          A.ll.pose(1.0, 1.4); A.lr.pose(1.0, 1.4);
+          this.head.rotation.z = s * 0.18; this.body.rotation.y = s * 0.3;
+        } else if (bar === 1) { // "ballo del robot": pose a scatti, una per battito
+          const P = [[2.6, 0.6, 0.3, -0.2, 1.6, 1.4, 0.2, 0], [0.3, -0.2, 2.6, 0.6, 0.2, 0, 1.6, 1.4],
+            [1.6, 1.5, 1.6, 1.5, 1.6, -1.4, 1.6, -1.4], [2.9, 0, 2.9, 0, 0.6, 0, 0.6, 0]];
+          const cur = P[Math.floor(beat) % 4], prev = P[(Math.floor(beat) + 3) % 4], k = clamp(bb / 0.15);
+          const q = j => lerp(prev[j], cur[j], k);
+          A.ul.pose(q(0), q(1)); A.ur.pose(q(2), q(3)); A.ll.pose(q(4), q(5)); A.lr.pose(q(6), q(7));
+          this.head.rotation.y = (Math.floor(beat) % 2 ? 0.4 : -0.4) * k;
+        } else if (bar === 2) { // giravolta con le braccia aperte
+          this.body.rotation.y = ((beat - 8) / 4) * Math.PI * 2;
+          const w = Math.sin(beat * Math.PI * 2) * 0.2;
+          A.ul.pose(1.9, w); A.ur.pose(1.9, -w); A.ll.pose(1.6, -w); A.lr.pose(1.6, w);
+        } else if (bar === 3) { // saltelli con le eliche a tutta
+          spinTarget = 45;
+          this.body.position.y = Math.abs(Math.sin(beat * Math.PI)) * 0.25;
+          const w = Math.sin(beat * Math.PI * 4) * 0.3;
+          A.ul.pose(2.8, w); A.ur.pose(2.8, -w); A.ll.pose(2.2, w); A.lr.pose(2.2, -w);
+          this.head.rotation.z = w * 0.4;
+        } else {                // ta-daaa!
+          this.body.position.y = 0;
+          A.ul.pose(2.9, 0.2); A.ur.pose(2.9, -0.2); A.ll.pose(1.9, 0.3); A.lr.pose(1.9, 0.3);
+          this.legs.forEach(l => { l.hip.rotation.x = 0; l.knee.rotation.x = 0; });
+          if (!this.tada) { this.tada = true; this.bubble.say('Ta-daaa!', 2.5); }
+        }
+        if (beat > 19) { this.action = null; this.tada = false; }
+        break;
+      }
+    }
+    this.body.position.y += lift;
+    // eliche
+    this.spin = lerp(this.spin, spinTarget, 1 - Math.exp(-dt * 2));
+    this.propAngle += this.spin * dt;
+    this.props.forEach((p, i) => (p.rotation.y = this.propAngle * (i === 1 ? -1 : 1)));
+    this.blur.opacity = clamp((this.spin - 10) / 40) * 0.45;
+    if (this.action !== 'lego') { this.hatch.rotation.x = 0; this.hatchGlow.material.opacity = 0; }
+    this.bubble.update(now);
+  }
+}
+
+startLab(Binot, {
+  name: 'Binot', color: 0xff7a3d,
+  // programma di esempio che si vede aprendo i blocchi
+  program: ['ciao', ['avanti', 2], ['gira', 'dx'], ['gira', 'dx'], ['dici', 'Ora volo!'], 'vola', ['casa'], 'danza'],
+});
+</script>
+</body>
+</html>

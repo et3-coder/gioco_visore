@@ -52,6 +52,12 @@ e si comportano come oggetti veri.
   da solo al suo posto dicendo "Torno da te!".
 - *Chiama i robot* li riporta sul tavolo; *Tutti a ballare* li fa ballare con la musica.
 
+**Laboratorio** (quarto pulsante del menu, cartella `lab/`): il laboratorio di **Binot** (vola con le eliche,
+4 braccia, costruisce torri di Lego, due telecamere) e **Galaxine** (vola con l'aria compressa, gambe a pistone,
+barzellette). Ogni robot ha i suoi pulsanti azione e la **programmazione a blocchi** in stile Scratch (Blockly,
+caricato da internet). È una pagina separata: dal visore la sessione VR si chiude e nel laboratorio si rientra
+con il suo pulsante VR; il pulsante "← Torna ai tre amici robot" riporta al gioco.
+
 **AIBI** è l'aiutante: legge le istruzioni ad alta voce (pulsante con l'altoparlante per riascoltarle)
 e dopo 2 tentativi sbagliati dà un suggerimento. Dal livello 10 c'è anche la sfida del "programma più corto".
 

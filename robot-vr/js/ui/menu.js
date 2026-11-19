@@ -31,13 +31,16 @@ export function showMainMenu(game) {
 
   const unlocked = game.unlocked; // numero di livelli sbloccati
   const next = Math.min(unlocked, LEVELS.length) - 1;
-  // Le tre modalità: livelli, palco, coccole e lanci
-  const play = makeButton(0.7, 0.2, unlocked > 1 ? `Gioca! (livello ${next + 1})` : 'Gioca!', () => game.startLevel(next), { color: '#2fbf71', icon: icons.play, size: 64 });
-  scr.add(play, -0.73, LAYOUT.track + 0.01);
-  const stage = makeButton(0.62, 0.2, 'Il palco', () => game.startStage(), { color: '#ff4fa3', icon: icons.star, size: 64 });
-  scr.add(stage, -0.02, LAYOUT.track + 0.01);
-  const cuddle = makeButton(0.72, 0.2, 'Coccole e lanci', () => game.startPlay(), { color: '#ff8a3d', icon: icons.heart, size: 58 });
-  scr.add(cuddle, 0.72, LAYOUT.track + 0.01);
+  // Le quattro modalità: livelli, palco, coccole e lanci, laboratorio
+  const W4 = 0.5, STEP4 = 0.54;
+  const play = makeButton(W4, 0.2, unlocked > 1 ? `Gioca! (liv. ${next + 1})` : 'Gioca!', () => game.startLevel(next), { color: '#2fbf71', icon: icons.play, size: 56 });
+  scr.add(play, -1.5 * STEP4, LAYOUT.track + 0.01);
+  const stage = makeButton(W4, 0.2, 'Il palco', () => game.startStage(), { color: '#ff4fa3', icon: icons.star, size: 56 });
+  scr.add(stage, -0.5 * STEP4, LAYOUT.track + 0.01);
+  const cuddle = makeButton(W4, 0.2, 'Coccole e lanci', () => game.startPlay(), { color: '#ff8a3d', icon: icons.heart, size: 50 });
+  scr.add(cuddle, 0.5 * STEP4, LAYOUT.track + 0.01);
+  const lab = makeButton(W4, 0.2, 'Laboratorio', () => game.openLab(), { color: '#3d6dff', size: 52 });
+  scr.add(lab, 1.5 * STEP4, LAYOUT.track + 0.01);
 
   // Livelli su due file: superati = dorati, da fare = colore del robot, bloccati = grigi
   const ROBOT_COLOR = { emo: '#6a5cff', loona: '#ff8a3d', aibi: '#22b07d' };
@@ -65,5 +68,5 @@ export function showMainMenu(game) {
 
   game.say(unlocked > 1
     ? `Eccoti di nuovo! Premi Gioca per continuare dal livello ${next + 1}, oppure scegli un livello qui sotto.`
-    : 'Ciao! Io sono AIBI. In ogni livello guiderai uno di noi tre: EMO, Loona o me! Ogni livello è un po\' più difficile. Premi Gioca, sali sul palco per inventare uno spettacolo, oppure scegli Coccole e lanci per giocare con noi!');
+    : 'Ciao! Io sono AIBI. In ogni livello guiderai uno di noi tre: EMO, Loona o me! Ogni livello è un po\' più difficile. Premi Gioca, sali sul palco per inventare uno spettacolo, scegli Coccole e lanci per giocare con noi, oppure visita il Laboratorio di Binot e Galaxine!');
 }

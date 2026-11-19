@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laboratorio dei Robot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#1d2433;--sky:#dfeefc}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--sky);color:var(--ink);font-family:"Baloo 2",system-ui,sans-serif;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 16px}
+  h1{margin:0 0 6px;font-size:clamp(32px,5vw,56px);text-align:center}
+  p{margin:0 0 24px;font-size:20px;text-align:center}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;width:min(900px,100%)}
+  a.card{display:block;background:#fff;border-radius:24px;overflow:hidden;text-decoration:none;color:inherit;
+    box-shadow:0 8px 28px rgba(0,0,0,.12);border-top:10px solid var(--c);transition:transform .15s}
+  a.card:hover{transform:translateY(-6px) rotate(-.5deg)}
+  .card img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:#f4f4f4}
+  .card div{padding:10px 18px 16px}
+  .card h2{margin:0;font-size:34px;color:var(--c)}
+  .card span{font-size:17px}
+  #home{position:fixed;top:12px;left:14px;font:inherit;font-weight:600;font-size:16px;border-radius:999px;padding:6px 16px;
+    background:#fff;color:var(--ink);text-decoration:none;box-shadow:0 3px 10px rgba(0,0,0,.12)}
+</style>
+</head>
+<body>
+  <a id="home" href="../index.html">← Torna ai tre amici robot</a>
+  <h1>🤖 Il laboratorio dei nostri robot</h1>
+  <p>Scegli un robot e guardalo prendere vita! Con 🧩 <b>Programma</b> puoi anche dargli ordini a blocchi.</p>
+  <div class="grid">
+    <a class="card" href="binot.html" style="--c:#ff7a3d">
+      <img src="binot-3d.jpg" alt="Modello 3D di Binot">
+      <div><h2>Binot</h2><span>Vola con le eliche, ha 4 braccia, costruisce con i Lego e ha due telecamere.</span></div>
+    </a>
+    <a class="card" href="galaxine.html" style="--c:#3d6dff">
+      <img src="galaxine-3d.jpg" alt="Modello 3D di Galaxine">
+      <div><h2>Galaxine</h2><span>Vola con l’aria compressa, atterra sulle gambe a pistone, racconta barzellette e ti aiuta.</span></div>
+    </a>
+  </div>
+</body>
+</html>

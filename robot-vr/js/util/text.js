@@ -54,7 +54,9 @@ export function drawTextBlock(ctx, text, { x, y, w, h, size = 48, minSize = 18, 
   for (;;) {
     ctx.font = `${weight} ${s}px ${FONT}`;
     lines = wrapLines(ctx, text, w);
-    if (lines.length * s * lineGap <= h || s <= minSize) break;
+    // entra se non è troppo alto E nessuna riga (per esempio una parola lunga) è più larga dello spazio
+    const tooWide = lines.some((l) => ctx.measureText(l).width > w);
+    if ((lines.length * s * lineGap <= h && !tooWide) || s <= minSize) break;
     s -= 2;
   }
   ctx.fillStyle = color;
