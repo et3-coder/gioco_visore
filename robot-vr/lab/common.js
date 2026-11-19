@@ -49,14 +49,45 @@ function wrap(g, text, maxW) {
 
 /* ---------- voce ---------- */
 let voiceOn = true;
+// La sintesi vocale del browser non sempre funziona (sul visore spesso mancano le voci italiane):
+// per questo il robot "parla" anche con la sua voce da robot (bip e sillabe), che si sente sempre.
+const hasTTS = () => 'speechSynthesis' in window && speechSynthesis.getVoices().length > 0;
+if ('speechSynthesis' in window) speechSynthesis.getVoices(); // avvia il caricamento delle voci
 export function speak(text, pitch = 1.2) {
-  if (!voiceOn || !('speechSynthesis' in window)) return;
-  speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text.replace(/\n/g, ' '));
-  u.lang = 'it-IT'; u.pitch = pitch; u.rate = 1.02;
-  const v = speechSynthesis.getVoices().find(v => v.lang && v.lang.toLowerCase().startsWith('it'));
-  if (v) u.voice = v;
-  speechSynthesis.speak(u);
+  if (!voiceOn) return;
+  const clean = text.replace(/\n/g, ' ').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}♪]/gu, '').trim();
+  const tts = hasTTS();
+  babble(clean, pitch, tts ? 0.05 : 0.12); // con la voce vera i bip sono più piano
+  if (!tts) return;
+  try {
+    speechSynthesis.cancel();
+    speechSynthesis.resume(); // Chrome a volte resta "in pausa"
+    const u = new SpeechSynthesisUtterance(clean);
+    u.lang = 'it-IT'; u.pitch = pitch; u.rate = 1.02;
+    const v = speechSynthesis.getVoices().find(v => v.lang && v.lang.toLowerCase().startsWith('it'));
+    if (v) u.voice = v;
+    setTimeout(() => speechSynthesis.speak(u), 60); // subito dopo cancel() a volte la frase si perde
+  } catch { /* niente voce: restano i bip */ }
+}
+// "voce da robot": una sillaba sintetizzata ogni ~3 lettere, con note che salgono e scendono
+function babble(text, pitch, vol) {
+  try {
+    const ac = audio(), out = ac.createGain(); out.gain.value = vol; out.connect(ac.destination);
+    const n = Math.max(2, Math.min(14, Math.round(text.length / 3)));
+    const base = 260 * pitch;
+    let t = ac.currentTime + 0.02;
+    for (let i = 0; i < n; i++) {
+      const o = ac.createOscillator(), g = ac.createGain();
+      const f = base * (0.8 + Math.random() * 0.6) * (text.trim().endsWith('?') && i === n - 1 ? 1.4 : 1);
+      const d = 0.06 + Math.random() * 0.05;
+      o.type = i % 3 ? 'triangle' : 'square';
+      o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * (Math.random() < 0.5 ? 1.3 : 0.75), t + d);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(1, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      o.connect(g).connect(out); o.start(t); o.stop(t + d + 0.02);
+      t += d + 0.03 + Math.random() * 0.03;
+    }
+    setTimeout(() => out.disconnect(), (t - ac.currentTime + 0.3) * 1000);
+  } catch { /* audio non disponibile */ }
 }
 
 /* ---------- fumetto ---------- */
@@ -283,6 +314,7 @@ export function startLab(RobotClass, { name, color, program = [], look: lookCfg 
   document.documentElement.style.setProperty('--c', css);
   document.body.insertAdjacentHTML('beforeend', `
     <a id="back" href="index.html">← Tutti i robot</a>
+    <a id="backGame" href="../index.html">🏠 Torna al gioco</a>
     <div id="title">🤖 ${name}</div>
     <div id="tools"><button id="bLook">🎨 Personalizza</button><button id="bCode">🧩 Programma</button><button id="bVoice">🔊 Voce</button><button id="bView">🎥 Vista</button></div>
     <div id="hint">👆 Tocca ${name} per fargli le coccole, trascinalo per lanciarlo!</div>
@@ -544,6 +576,14 @@ export function startLab(RobotClass, { name, color, program = [], look: lookCfg 
     ray.setFromCamera(ndc, camera);
   };
   // in fase di "cattura": così, se tocco il robot, la telecamera non gira
+  // al primo tocco (sul PC) il robot si presenta: i browser fanno partire l'audio solo dopo un tocco
+  let greeted = false;
+  addEventListener('pointerdown', () => {
+    if (greeted) return;
+    greeted = true;
+    audio();
+    setTimeout(() => { if (!robot.action && T.mode === 'home' && T.petCool <= 0) robot.do('ciao'); }, 150);
+  }, { capture: true });
   renderer.domElement.addEventListener('pointerdown', e => {
     setRay(e);
     const h = ray.intersectObject(robot.root, true)[0];
@@ -577,10 +617,10 @@ export function startLab(RobotClass, { name, color, program = [], look: lookCfg 
   const vrButtons = [];
   const panels = [];
   // list = [[id, testo], ...]; onPress(id) quando si preme
-  function makeVrPanel(list, titleText, x, rotY, onPress) {
+  function makeVrPanel(list, titleText, x, rotY, onPress, y = 1.0, z = -1.15, tilt = -0.55) {
     const panel = new THREE.Group(); panel.visible = false; scene.add(panel); panels.push(panel);
     const n = list.length, rows = Math.ceil(n / 2), PH = 0.13 + rows * 0.105;
-    panel.position.set(x, 1.0, -1.15); panel.rotation.set(-0.55, rotY, 0, 'YXZ');
+    panel.position.set(x, y, z); panel.rotation.set(tilt, rotY, 0, 'YXZ');
     panel.add(new THREE.Mesh(new THREE.PlaneGeometry(0.52, PH), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.88 })));
     const { g, tex } = canvasTex(512, 96);
     g.fillStyle = css; g.font = `800 64px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(titleText, 256, 52);
@@ -602,6 +642,14 @@ export function startLab(RobotClass, { name, color, program = [], look: lookCfg 
   // a sinistra: le azioni del robot
   makeVrPanel([...robot.actions, ['__prog', '🧩 Il mio programma']], name, -0.5, 0.45,
     id => (id === '__prog' ? coding.run() : robot.do(id)));
+  // in alto al centro, sopra il robot: per tornare indietro (nel visore i pulsanti della pagina non si vedono)
+  const leave = async url => {
+    const s = renderer.xr.getSession();
+    if (s) { try { await s.end(); } catch { /* già chiusa */ } }
+    location.href = url;
+  };
+  makeVrPanel([['__game', '⬅ Torna al gioco'], ['__list', '🤖 Tutti i robot']], 'Indietro', 0, 0,
+    id => leave(id === '__game' ? '../index.html' : 'index.html'), 2.0, -1.45, 0.3);
   // a destra: vestiti e colori
   if (look) {
     makeVrPanel([
@@ -662,7 +710,11 @@ export function startLab(RobotClass, { name, color, program = [], look: lookCfg 
       if (headBox.containsPoint(p)) { T.stroke += p.distanceTo(prev); if (T.stroke > 0.15) { T.stroke = 0; pet(c); } }
     }
   }
-  renderer.xr.addEventListener('sessionstart', () => { document.body.classList.add('xr'); panels.forEach(p => (p.visible = true)); });
+  renderer.xr.addEventListener('sessionstart', () => {
+    document.body.classList.add('xr'); panels.forEach(p => (p.visible = true));
+    // appena si entra nel visore il robot si presenta (il pulsante VR "sblocca" anche l'audio)
+    setTimeout(() => { if (!robot.action) robot.do('ciao'); greeted = true; }, 900);
+  });
   renderer.xr.addEventListener('sessionend', () => { document.body.classList.remove('xr'); panels.forEach(p => (p.visible = false)); setView(viewIdx); });
 
   /* ---------- pannello "Personalizza" (PC) ---------- */

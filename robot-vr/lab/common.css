@@ -13,7 +13,8 @@ canvas{display:block}
 .btns button:active{transform:scale(.95)}
 #tools{position:fixed;top:12px;right:14px;display:flex;gap:6px}
 #back{position:fixed;top:12px;left:14px}
-#tools button,#back{font:inherit;font-weight:600;font-size:15px;border:0;border-radius:999px;padding:6px 14px;cursor:pointer;background:var(--card);
+#backGame{position:fixed;top:54px;left:14px}
+#tools button,#back,#backGame{font:inherit;font-weight:600;font-size:15px;border:0;border-radius:999px;padding:6px 14px;cursor:pointer;background:var(--card);
   box-shadow:0 3px 10px rgba(0,0,0,.12);color:var(--ink);text-decoration:none}
 #VRButton{bottom:auto!important;top:62px!important;font-family:"Baloo 2",sans-serif!important;background:rgba(29,36,51,.85)!important;border-radius:999px!important}
 @media (max-width:700px){
@@ -21,7 +22,8 @@ canvas{display:block}
   #VRButton{top:100px!important}
   .btns button{font-size:14px;padding:5px 9px}
 }
-body.xr .panel,body.xr #tools,body.xr #title,body.xr #back,body.xr #look,body.xr #hint{display:none}
+body.xr .panel,body.xr #tools,body.xr #title,body.xr #back,body.xr #backGame,body.xr #look,body.xr #hint{display:none}
+body.coding #backGame{display:none}
 
 /* ---------- suggerimento "tocca / trascina" ---------- */
 #hint{position:fixed;top:108px;left:50%;transform:translateX(-50%);background:var(--card);padding:4px 16px;border-radius:999px;

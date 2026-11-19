@@ -54,6 +54,35 @@ export const sfx = {
     for (let t = 0, i = 0; t < seconds; t += 0.3, i++) tone(i % 2 ? 220 : 147, 0.1, { type: 'square', vol: 0.05, when: t });
   },
   boing() { tone(220, 0.35, { type: 'sine', vol: 0.15, slideTo: 660 }); },
+  // "voce da robot": una sillaba sintetizzata ogni ~3 lettere (si sente anche se il visore non ha la voce italiana)
+  babble(text, pitch = 1.25, vol = 0.1) {
+    const c = ac();
+    // prima del primo tocco l'audio è bloccato: i bip suonerebbero tutti insieme più tardi, meglio saltarli
+    if (!c || c.state !== 'running') return;
+    const out = c.createGain();
+    out.gain.value = vol;
+    out.connect(c.destination);
+    const n = Math.max(2, Math.min(14, Math.round(text.length / 3)));
+    const base = 260 * pitch;
+    const question = text.trim().endsWith('?');
+    let t = c.currentTime + 0.02;
+    for (let i = 0; i < n; i++) {
+      const o = c.createOscillator(), g = c.createGain();
+      const f = base * (0.8 + Math.random() * 0.6) * (question && i === n - 1 ? 1.4 : 1);
+      const d = 0.06 + Math.random() * 0.05;
+      o.type = i % 3 ? 'triangle' : 'square';
+      o.frequency.setValueAtTime(f, t);
+      o.frequency.exponentialRampToValueAtTime(f * (Math.random() < 0.5 ? 1.3 : 0.75), t + d);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(1, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      o.connect(g).connect(out);
+      o.start(t);
+      o.stop(t + d + 0.02);
+      t += d + 0.03 + Math.random() * 0.03;
+    }
+    setTimeout(() => out.disconnect(), (t - c.currentTime + 0.3) * 1000);
+  },
   // fusa quando si accarezza un robot: suono basso che "vibra"
   purr() {
     const c = ac();

@@ -1,4 +1,6 @@
 // Voce di AIBI (sintesi vocale del browser) e frasi ricorrenti.
+import { sfx } from './audio.js';
+
 let enabled = true;
 let voice = null;
 
@@ -21,19 +23,28 @@ function clean(text) {
     .trim();
 }
 
+// La sintesi vocale del browser non sempre funziona (sul visore spesso mancano le voci italiane):
+// per questo i robot "parlano" anche con la loro voce da robot (bip e sillabe), che si sente sempre.
+const hasTTS = () => 'speechSynthesis' in window && speechSynthesis.getVoices().length > 0;
+
 // pitch/rate permettono voci diverse per ogni robot (EMO più acuto, Loona ancora di più...)
 export function speak(text, { pitch = 1.25, rate = 0.95 } = {}) {
-  if (!enabled || !('speechSynthesis' in window)) return;
+  if (!enabled) return;
+  const t = clean(text);
+  const tts = hasTTS();
+  sfx.babble(t, pitch, tts ? 0.04 : 0.11); // con la voce vera i bip sono più piano
+  if (!tts) return;
   try {
     speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(clean(text));
+    speechSynthesis.resume(); // Chrome a volte resta "in pausa"
+    const u = new SpeechSynthesisUtterance(t);
     u.lang = 'it-IT';
     if (voice) u.voice = voice;
     u.rate = rate;
     u.pitch = pitch;
-    speechSynthesis.speak(u);
+    setTimeout(() => speechSynthesis.speak(u), 60); // subito dopo cancel() a volte la frase si perde
   } catch (e) {
-    /* la voce non è disponibile: si legge solo il testo */
+    /* la voce non è disponibile: restano i bip e il testo */
   }
 }
 
