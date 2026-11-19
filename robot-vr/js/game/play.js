@@ -13,6 +13,7 @@ import { sfx, music } from '../audio.js';
 import { speak } from '../hints.js';
 import { heartsAt } from '../effects.js';
 import { animate, ease } from '../util/tween.js';
+import { ITEMS, SLOTS, makeItem, wearOn, slotOf } from './wardrobe.js';
 
 const SCALE = 1.4; // robot un po' più grandi, così si prendono meglio
 const GRAVITY = 9.8;
@@ -30,7 +31,11 @@ const LINES = {
   grab: ['Eccomi!', 'Ciao!', 'Dove andiamo?'],
   fly: ['Wiii!', 'Si vola!', 'Evviva!'],
   land: ['Ops!', 'Gira tutto!', 'Ancora!', 'Che volo!'],
+  dress: ['Mi sta benissimo!', 'Che bello!', 'Grazie!', 'Che eleganza!', 'Guarda come sono bello!'],
 };
+const TRAY_Z = -0.37; // vassoio dei vestiti, sul bordo del tavolo vicino al bambino
+const WEAR_DIST = 0.14; // distanza dal punto di aggancio per "indossare" un accessorio (visore)
+const WEAR_DIST_SCREEN = 0.12; // stessa cosa con il mouse, misurata sullo schermo
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const ID_Q = new THREE.Quaternion();
 const now = () => performance.now() / 1000;
@@ -73,6 +78,7 @@ export class Play {
         up: 0, stroke: 0, cool: 0, flew: false,
       };
     }
+    this.setupWardrobe();
     const p = g.pointers;
     p.onXR = (type, entry) => this.onXR(type, entry);
     p.onMouseDown = (rc, e) => this.onMouseDown(rc, e);
@@ -80,13 +86,222 @@ export class Play {
     p.onMouseUp = (rc, e) => this.onMouseUp(rc, e);
     this.buildUI();
     g.say(g.mode === 'desktop'
-      ? 'Clicca su un robot per accarezzarlo. Trascinalo con il mouse e lascialo andare per lanciarlo!'
-      : 'Avvicina il controller alla testa di un robot e muovilo per accarezzarlo. Tieni premuto il tasto laterale vicino a un robot, oppure puntalo e premi il grilletto, per prenderlo. Lascia il tasto per lanciarlo!');
+      ? 'Clicca su un robot per accarezzarlo, trascinalo e lascialo andare per lanciarlo. Trascina un vestito dal vassoio sulla testa di un robot per vestirlo!'
+      : 'Avvicina il controller alla testa di un robot e muovilo per accarezzarlo. Tieni premuto il tasto laterale vicino a un robot, oppure puntalo e premi il grilletto, per prenderlo e lanciarlo. Prendi un vestito dal vassoio e appoggialo sulla testa di un robot!');
   }
 
   dispose() {
     const p = this.game.pointers;
     p.onXR = p.onMouseDown = p.onMouseMove = p.onMouseUp = null;
+    // i vestiti indossati restano sui robot; quelli liberi tornano nel guardaroba
+    for (const it of this.items) {
+      if (it.wornBy) continue;
+      it.mode = 'rest';
+      it.holder = null;
+      if (it.obj.parent) it.obj.parent.remove(it.obj);
+    }
+    if (this.tray && this.tray.parent) this.tray.parent.remove(this.tray);
+  }
+
+  // ---------- Guardaroba ----------
+  setupWardrobe() {
+    const g = this.game;
+    // gli accessori sono gli stessi per tutta la partita (così un robot vestito resta vestito)
+    if (!g.wardrobe) {
+      g.wardrobe = ITEMS.map((d) => ({
+        id: d.id, obj: makeItem(d.id), mode: 'rest', wornBy: null,
+        vel: new THREE.Vector3(), holder: null, hist: [], relQ: new THREE.Quaternion(), farTime: 0,
+      }));
+    }
+    this.items = g.wardrobe;
+    // vassoio rosa
+    this.tray = new THREE.Mesh(
+      new THREE.BoxGeometry(1.24, 0.012, 0.14),
+      new THREE.MeshStandardMaterial({ color: 0xffc2dd, roughness: 0.6 })
+    );
+    this.tray.position.set(0, TABLE_TOP + 0.006, TRAY_Z);
+    g.world.add(this.tray);
+    this.items.forEach((it, i) => {
+      if (it.wornBy) return;
+      g.world.add(it.obj);
+      it.mode = 'rest';
+      it.obj.position.copy(this.itemHome(i));
+      it.obj.quaternion.identity();
+      it.obj.scale.setScalar(SCALE);
+    });
+  }
+
+  itemHome(i) {
+    return new THREE.Vector3(-0.5 + i * 0.2, TABLE_TOP + 0.012, TRAY_Z);
+  }
+
+  itemPos(it) {
+    return this.game.world.worldToLocal(it.obj.getWorldPosition(new THREE.Vector3()));
+  }
+
+  slotPos(k, slotName) {
+    const s = SLOTS[k][slotName];
+    const v = this.robot(k).head.localToWorld(new THREE.Vector3(s.p[0], s.p[1], s.p[2]));
+    return this.game.world.worldToLocal(v);
+  }
+
+  hitItem(raycaster) {
+    const objs = this.items.map((it) => it.obj).filter((o) => o.parent);
+    const hits = raycaster.intersectObjects(objs, true);
+    for (const h of hits) {
+      let o = h.object;
+      while (o) {
+        const it = this.items.find((x) => x.obj === o);
+        if (it) return { it, point: h.point };
+        o = o.parent;
+      }
+    }
+    return null;
+  }
+
+  // toglie l'accessorio dal robot e lo rimette "libero" nella stanza
+  detach(it) {
+    if (!it.wornBy) return;
+    this.game.world.attach(it.obj); // mantiene posizione e rotazione nel mondo
+    it.obj.scale.setScalar(SCALE);
+    it.wornBy = null;
+  }
+
+  grabItem(it, holder) {
+    if (it.mode === 'held') return;
+    if (it.wornBy) {
+      const k = it.wornBy;
+      this.detach(it);
+      this.robot(k).face.set('surprised', 0.8);
+    }
+    it.mode = 'held';
+    it.holder = holder;
+    it.hist = [];
+    if (holder !== 'mouse') {
+      const { q } = this.ctrlPose(holder);
+      it.relQ.copy(q).invert().multiply(it.obj.quaternion);
+      this.game.pointers.haptic(holder, 0.3, 30);
+    }
+    sfx.grab();
+  }
+
+  // Lasciato vicino alla testa di un robot = lo indossa; altrimenti viene lanciato
+  releaseItem(it, viaMouse = false) {
+    it.holder = null;
+    const slot = slotOf(it.id);
+    let best = null, bestD = Infinity;
+    const ip = this.itemPos(it);
+    for (const k of this.keys) {
+      if (this.st[k].mode === 'held') continue;
+      const sp = this.slotPos(k, slot);
+      let d;
+      if (viaMouse) {
+        const a = this.game.world.localToWorld(ip.clone()).project(this.game.camera);
+        const b = this.game.world.localToWorld(sp.clone()).project(this.game.camera);
+        d = Math.hypot(a.x - b.x, a.y - b.y) / WEAR_DIST_SCREEN * WEAR_DIST;
+      } else {
+        d = ip.distanceTo(sp);
+      }
+      if (d < WEAR_DIST && d < bestD) { bestD = d; best = k; }
+    }
+    if (best) return this.wear(it, best);
+    // lancio
+    const t = now();
+    const h = it.hist.filter((s) => s.t >= t - 0.1);
+    const v = new THREE.Vector3();
+    if (h.length >= 2) {
+      const a = h[0], b = h[h.length - 1];
+      if (b.t - a.t > 0.005) v.subVectors(b.p, a.p).divideScalar(b.t - a.t);
+    }
+    it.vel.copy(v.clampLength(0, 6));
+    it.mode = 'air';
+  }
+
+  wear(it, k) {
+    const slot = slotOf(it.id);
+    // se il robot aveva già qualcosa in quel posto, quello vecchio cade sul tavolo
+    for (const other of this.items) {
+      if (other !== it && other.wornBy === k && slotOf(other.id) === slot) {
+        this.detach(other);
+        other.vel.set((Math.random() - 0.5) * 0.6, 1.4, 0.4);
+        other.mode = 'air';
+      }
+    }
+    wearOn(k, this.robot(k), it);
+    it.wornBy = k;
+    it.mode = 'worn';
+    const r = this.robot(k);
+    r.face.set('love', 2.5);
+    r.talk(1.2);
+    sfx.star();
+    heartsAt(this.game.world, this.localPoint(k, HEAD_Y[k] + 0.04), 8);
+    this.say(k, 'dress');
+  }
+
+  returnItemHome(it) {
+    const i = this.items.indexOf(it);
+    if (it.wornBy) this.detach(it);
+    it.mode = 'home';
+    it.farTime = 0;
+    const from = it.obj.position.clone(), to = this.itemHome(i), fq = it.obj.quaternion.clone();
+    const dist = from.distanceTo(to);
+    animate(Math.min(1.4, 0.6 + dist * 0.2), (t) => {
+      it.obj.position.lerpVectors(from, to, t);
+      it.obj.position.y += Math.sin(t * Math.PI) * Math.min(0.8, 0.15 + dist * 0.2);
+      it.obj.quaternion.slerpQuaternions(fq, ID_Q, t);
+    }).then(() => {
+      if (it.mode !== 'home') return;
+      it.obj.position.copy(to);
+      it.obj.quaternion.identity();
+      it.mode = 'rest';
+    });
+  }
+
+  undressAll() {
+    let any = false;
+    for (const it of this.items) {
+      if (it.wornBy) { this.returnItemHome(it); any = true; }
+    }
+    if (any) sfx.whee();
+  }
+
+  updateItems(dt) {
+    for (const it of this.items) {
+      const pos = it.obj.position;
+      if (it.mode === 'held') {
+        if (it.holder === 'mouse' && (!this.mouse || this.mouse.it !== it)) { this.releaseItem(it, true); continue; }
+        if (it.holder !== 'mouse' && it.holder && !it.holder.source) { this.releaseItem(it); continue; }
+        if (it.holder !== 'mouse') {
+          const { p, q } = this.ctrlPose(it.holder);
+          it.obj.quaternion.slerp(q.multiply(it.relQ), Math.min(1, dt * 15));
+          pos.lerp(p, Math.min(1, dt * 18));
+          it.hist.push({ p: pos.clone(), t: now() });
+          if (it.hist.length > 12) it.hist.shift();
+        }
+      } else if (it.mode === 'air') {
+        it.vel.y -= GRAVITY * dt;
+        const prevY = pos.y;
+        pos.addScaledVector(it.vel, dt);
+        const rr = Math.hypot(pos.x, pos.z);
+        if (rr > ROOM_R) { pos.x *= ROOM_R / rr; pos.z *= ROOM_R / rr; it.vel.x *= -0.5; it.vel.z *= -0.5; }
+        const ground = this.surfaceAt(pos, prevY);
+        if (pos.y <= ground) {
+          pos.y = ground;
+          const impact = -it.vel.y;
+          if (impact > 1.0) { it.vel.y = impact * 0.3; it.vel.x *= 0.5; it.vel.z *= 0.5; }
+          else { it.vel.set(0, 0, 0); it.mode = 'rest'; }
+        }
+      } else if (it.mode === 'rest') {
+        it.obj.quaternion.slerp(ID_Q, Math.min(1, dt * 6)); // si raddrizza
+        // finito lontano: torna da solo sul vassoio
+        if (this.isAway(pos)) {
+          it.farTime += dt;
+          if (it.farTime > 1.5) this.returnItemHome(it);
+        } else {
+          it.farTime = 0;
+        }
+      }
+    }
   }
 
   home(k) {
@@ -99,8 +314,9 @@ export class Play {
     const scr = game.screen;
     scr.clear();
     game.buildHeader('Coccole e lanci: gioca con i robot!');
-    scr.add(makeButton(0.72, 0.18, 'Chiama i robot', () => this.callHome(), { color: '#4d8dff', icon: icons.undo, size: 60 }), -0.45, LAYOUT.track - 0.02);
-    scr.add(makeButton(0.72, 0.18, 'Tutti a ballare', () => this.danceAll(), { color: '#ff4fa3', icon: icons.star, size: 60 }), 0.42, LAYOUT.track - 0.02);
+    scr.add(makeButton(0.62, 0.18, 'Chiama i robot', () => this.callHome(), { color: '#4d8dff', icon: icons.undo, size: 54 }), -0.7, LAYOUT.track - 0.02);
+    scr.add(makeButton(0.62, 0.18, 'Tutti a ballare', () => this.danceAll(), { color: '#ff4fa3', icon: icons.star, size: 54 }), 0, LAYOUT.track - 0.02);
+    scr.add(makeButton(0.62, 0.18, 'Togli i vestiti', () => this.undressAll(), { color: '#ff8a3d', icon: icons.trash, size: 54 }), 0.7, LAYOUT.track - 0.02);
     scr.add(makeButton(0.36, 0.14, 'Menu', () => this.game.goMenu(), { color: '#8a7fb0', icon: icons.home, size: 52 }), 0, LAYOUT.buttons);
   }
 
@@ -147,7 +363,7 @@ export class Play {
   }
 
   holding(entry) {
-    return this.keys.some((k) => this.st[k].holder === entry);
+    return this.keys.some((k) => this.st[k].holder === entry) || this.items.some((it) => it.holder === entry);
   }
 
   surfaceAt(p, prevY) {
@@ -215,34 +431,51 @@ export class Play {
   // ---------- Controller ----------
   onXR(type, entry) {
     if (type === 'squeezestart') {
-      // prende il robot più vicino alla mano
+      // prende la cosa più vicina alla mano: un vestito (anche indossato) o un robot
       const { p } = this.ctrlPose(entry);
       let best = null, bestD = GRAB_DIST;
+      for (const it of this.items) {
+        if (it.mode === 'held' || !it.obj.parent) continue;
+        const d = p.distanceTo(this.itemPos(it)) * 0.8; // i vestiti sono piccoli: hanno un po' di precedenza
+        if (d < bestD) { bestD = d; best = { it }; }
+      }
       for (const k of this.keys) {
         if (this.st[k].mode === 'held') continue;
         const d = p.distanceTo(this.localPoint(k, MID_Y[k]));
-        if (d < bestD) { bestD = d; best = k; }
+        if (d < bestD) { bestD = d; best = { k }; }
       }
-      if (best) this.grab(best, entry);
+      if (best && best.it) this.grabItem(best.it, entry);
+      else if (best) this.grab(best.k, entry);
     } else if (type === 'selectstart') {
-      // grilletto puntando un robot: il robot vola in mano (comodo anche per riprenderlo da terra)
+      // grilletto puntando un vestito o un robot: vola in mano (comodo anche per riprenderlo da terra)
       const m = new THREE.Matrix4().extractRotation(entry.controller.matrixWorld);
       this.raycaster.ray.origin.setFromMatrixPosition(entry.controller.matrixWorld);
       this.raycaster.ray.direction.set(0, 0, -1).applyMatrix4(m);
+      const hi = this.hitItem(this.raycaster);
+      if (hi && hi.it.mode !== 'held') { this.grabItem(hi.it, entry); return; }
       const hit = this.hitRobot(this.raycaster);
       if (hit && this.st[hit.k].mode !== 'held') this.grab(hit.k, entry);
     } else if (type === 'squeezeend' || type === 'selectend') {
       for (const k of this.keys) if (this.st[k].holder === entry) this.release(k);
+      for (const it of this.items) if (it.holder === entry) this.releaseItem(it);
     }
   }
 
   // ---------- Mouse (PC) ----------
   onMouseDown(raycaster, e) {
-    const hit = this.hitRobot(raycaster);
-    if (!hit) return;
     const cam = this.game.camera;
     const normal = new THREE.Vector3();
     cam.getWorldDirection(normal).negate();
+    // prima i vestiti (anche quelli indossati), poi i robot
+    const hi = this.hitItem(raycaster);
+    if (hi) {
+      const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, hi.point);
+      const objWorld = hi.it.obj.getWorldPosition(new THREE.Vector3());
+      this.mouse = { it: hi.it, x: e.clientX, y: e.clientY, moved: false, plane, offset: objWorld.sub(hi.point) };
+      return;
+    }
+    const hit = this.hitRobot(raycaster);
+    if (!hit) return;
     const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, hit.point);
     const groupWorld = this.robot(hit.k).group.getWorldPosition(new THREE.Vector3());
     this.mouse = { k: hit.k, x: e.clientX, y: e.clientY, moved: false, plane, offset: groupWorld.sub(hit.point) };
@@ -253,15 +486,16 @@ export class Play {
     if (!m) return;
     if (!m.moved && Math.hypot(e.clientX - m.x, e.clientY - m.y) > 5) {
       m.moved = true;
-      this.grab(m.k, 'mouse');
+      if (m.it) this.grabItem(m.it, 'mouse');
+      else this.grab(m.k, 'mouse');
     }
     if (!m.moved) return;
     const point = raycaster.ray.intersectPlane(m.plane, new THREE.Vector3());
     if (!point) return;
     const target = this.game.world.worldToLocal(point.add(m.offset));
     target.y = Math.max(target.y, 0);
-    this.robot(m.k).group.position.copy(target);
-    const st = this.st[m.k];
+    const st = m.it || this.st[m.k];
+    (m.it ? m.it.obj : this.robot(m.k).group).position.copy(target);
     st.hist.push({ p: target.clone(), t: now() });
     if (st.hist.length > 12) st.hist.shift();
   }
@@ -270,6 +504,11 @@ export class Play {
     const m = this.mouse;
     if (!m) return;
     this.mouse = null;
+    if (m.it) {
+      if (m.moved) this.releaseItem(m.it, true);
+      else if (m.it.wornBy) { sfx.remove(); this.returnItemHome(m.it); } // clic su un vestito indossato = toglierlo
+      return;
+    }
     if (m.moved) this.release(m.k);
     else if (this.st[m.k].cool <= 0) this.pet(m.k, null);
   }
@@ -335,6 +574,7 @@ export class Play {
         ctrls.push({ e, p, moved: prev ? p.distanceTo(prev) : 0 });
       }
     }
+    this.updateItems(dt);
 
     for (const k of this.keys) {
       const st = this.st[k];

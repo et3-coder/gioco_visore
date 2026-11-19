@@ -42,6 +42,12 @@ e si comportano come oggetti veri.
   al robot, oppure **puntalo e premi il grilletto**, per prenderlo; lascia il tasto mentre muovi la mano per
   **lanciarlo**: vola, ruota, rimbalza su tavolo e pavimento e poi si rialza da solo.
 - PC: clic su un robot = carezza; trascinalo con il mouse e lascialo andare = lancio.
+- **Vestirli**: sul vassoio rosa davanti al bambino ci sono 6 accessori (cilindro, corona, cappellino da festa,
+  fiocco, occhiali, papillon). Si prendono come i robot e si appoggiano sulla testa di un robot: si agganciano
+  da soli al posto giusto (cappelli in testa, occhiali sugli occhi, papillon sotto la faccia) e si adattano
+  alla grandezza di ogni robot. Un cappello nuovo fa cadere quello vecchio. Per toglierli si prendono dal robot
+  (sul PC: clic sull'accessorio indossato) oppure si preme *Togli i vestiti*. I robot restano vestiti anche
+  nei livelli e sul palco. Codice in `js/game/wardrobe.js` (modelli e punti di aggancio per ogni robot).
 - Se un robot finisce fuori dal tavolo (per terra, lontano, sotto il tavolo), dopo essersi rialzato torna
   da solo al suo posto dicendo "Torno da te!".
 - *Chiama i robot* li riporta sul tavolo; *Tutti a ballare* li fa ballare con la musica.
