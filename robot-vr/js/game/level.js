@@ -1,42 +1,36 @@
-// Logica comune ai capitoli "a carte" (1: costruisci il programma, 3: correggi il programma).
-import { LEVELS, CHAPTERS, DIRS, DIR_VEC } from '../levels.js';
+// Un livello del gioco: il bambino mette in fila le carte comando per portare EMO fino alla nota.
+import { LEVELS, INTRO, DIRS, DIR_VEC } from '../levels.js';
 import { ProgramTrack, buildPalette } from '../ui/cards.js';
 import { makeButton } from '../ui/ui.js';
 import { icons } from '../ui/icons.js';
-import { compile } from '../game/program.js';
+import { compile } from './program.js';
 import { wait, clearTweens } from '../util/tween.js';
 import { sfx } from '../audio.js';
 import { phrases } from '../hints.js';
 import { LAYOUT } from '../ui/layout.js';
 
-export class SequenceChapter {
-  constructor(game, chapterId, levelIndex, { debug = false, goalKind = 'note', goalName = 'la nota' } = {}) {
+const GOAL_NAME = 'la nota';
+
+export class Level {
+  constructor(game, index) {
     this.game = game;
-    this.chapterId = chapterId;
-    this.levelIndex = levelIndex;
-    this.debug = debug;
-    this.goalKind = goalKind;
-    this.goalName = goalName;
-    this.levels = LEVELS[chapterId][game.age];
-    this.level = this.levels[levelIndex];
-    this.chapter = CHAPTERS.find((c) => c.id === chapterId);
+    this.index = index;
+    this.level = LEVELS[index];
     this.robot = game.robots.emo;
     this.token = 0;
     this.running = false;
     this.dirty = false;
     this.fails = 0;
-    this.selected = null;
-    this.cards = debug ? [...this.level.preset] : [];
+    this.cards = [];
   }
 
   start() {
     const { game, level } = this;
-    game.board.build(level, this.goalKind);
+    game.board.build(level, 'note');
     game.showRobots(['emo']);
     this.placeAtStart();
     this.buildUI();
-    const intro = this.levelIndex === 0 ? `${this.chapter.intro} ${level.intro}` : level.intro;
-    game.say(intro);
+    game.say(this.index === 0 ? `${INTRO} ${level.intro}` : level.intro);
   }
 
   placeAtStart() {
@@ -52,22 +46,17 @@ export class SequenceChapter {
     const { game, level } = this;
     const scr = game.screen;
     scr.clear();
-    game.buildHeader(`Capitolo ${this.chapterId}: ${this.chapter.title}  ·  Livello ${this.levelIndex + 1} di ${this.levels.length}`);
+    game.buildHeader(`Livello ${this.index + 1} di ${LEVELS.length}`);
 
     this.track = new ProgramTrack(scr, { y: LAYOUT.track, max: level.max, onSlotClick: (i) => this.onSlotClick(i) });
     this.track.setCards(this.cards);
     buildPalette(scr, level.cards, LAYOUT.palette, (k) => this.onPick(k), level.cards.length > 5 ? 0.15 : 0.17);
 
     const by = LAYOUT.buttons;
-    this.playBtn = makeButton(0.42, 0.14, this.debug ? 'Prova' : 'Via!', () => (this.running ? this.stop() : this.run()), { color: '#2fbf71', icon: icons.play });
+    this.playBtn = makeButton(0.42, 0.14, 'Via!', () => (this.running ? this.stop() : this.run()), { color: '#2fbf71', icon: icons.play });
     scr.add(this.playBtn, -0.8, by);
-    if (this.debug) {
-      scr.add(makeButton(0.4, 0.14, 'Togli carta', () => this.removeSelected(), { color: '#ff7a59', icon: icons.trash, size: 52 }), -0.33, by);
-      scr.add(makeButton(0.36, 0.14, 'Da capo', () => this.restorePreset(), { color: '#4d8dff', icon: icons.undo, size: 52 }), 0.09, by);
-    } else {
-      scr.add(makeButton(0.44, 0.14, 'Cancella tutto', () => this.clearAll(), { color: '#ff7a59', icon: icons.trash, size: 50 }), -0.3, by);
-    }
-    scr.add(makeButton(0.36, 0.14, 'Menu', () => this.exit(), { color: '#8a7fb0', icon: icons.home, size: 52 }), this.debug ? 0.5 : 0.18, by);
+    scr.add(makeButton(0.44, 0.14, 'Cancella tutto', () => this.clearAll(), { color: '#ff7a59', icon: icons.trash, size: 50 }), -0.3, by);
+    scr.add(makeButton(0.36, 0.14, 'Menu', () => this.exit(), { color: '#8a7fb0', icon: icons.home, size: 52 }), 0.18, by);
     this.nextBtn = makeButton(0.4, 0.14, 'Avanti', () => this.next(), { color: '#ff3fa4', icon: icons.next });
     this.nextBtn.visible = false;
     scr.add(this.nextBtn, 0.86, by);
@@ -77,33 +66,19 @@ export class SequenceChapter {
   onSlotClick(i) {
     if (this.running) return;
     if (this.dirty) this.placeAtStart();
-    if (this.debug) {
-      this.selected = this.selected === i ? null : i;
-      this.track.select(this.selected);
-      sfx.click();
-      if (this.selected != null && this.fails === 0 && this.game.age === 'small') {
-        this.game.say('Ora tocca la carta giusta qui sotto, oppure premi Togli carta.');
-      }
-    } else {
-      this.cards.splice(i, 1);
-      this.track.setCards(this.cards);
-      sfx.remove();
-    }
+    this.cards.splice(i, 1); // toccare una carta del programma la toglie
+    this.track.setCards(this.cards);
+    sfx.remove();
   }
 
   onPick(kind) {
     if (this.running) return;
     if (this.dirty) this.placeAtStart();
-    if (this.debug && this.selected != null) {
-      this.cards[this.selected] = kind;
-      this.selected = null;
-      this.track.select(null);
-    } else if (this.cards.length < this.level.max) {
-      this.cards.push(kind);
-    } else {
+    if (this.cards.length >= this.level.max) {
       this.game.say(phrases.tooMany());
       return;
     }
+    this.cards.push(kind);
     this.track.setCards(this.cards);
     sfx.place();
   }
@@ -115,33 +90,10 @@ export class SequenceChapter {
     this.placeAtStart();
   }
 
-  removeSelected() {
-    if (this.running) return;
-    if (this.dirty) this.placeAtStart();
-    if (this.selected == null) {
-      this.game.say('Prima tocca una carta del programma, poi premi Togli carta.');
-      return;
-    }
-    this.cards.splice(this.selected, 1);
-    this.selected = null;
-    this.track.select(null);
-    this.track.setCards(this.cards);
-    sfx.remove();
-  }
-
-  restorePreset() {
-    if (this.running) return;
-    this.cards = [...this.level.preset];
-    this.selected = null;
-    this.track.select(null);
-    this.track.setCards(this.cards);
-    this.placeAtStart();
-  }
-
   // ---------- Esecuzione ----------
   setRunning(r) {
     this.running = r;
-    this.playBtn.userData.setText(r ? 'Stop' : this.debug ? 'Prova' : 'Via!');
+    this.playBtn.userData.setText(r ? 'Stop' : 'Via!');
     this.playBtn.userData.setColor(r ? '#ff5d5d' : '#2fbf71');
   }
 
@@ -157,8 +109,6 @@ export class SequenceChapter {
       this.game.say(phrases.empty());
       return;
     }
-    this.selected = null;
-    this.track.select(null);
     this.nextBtn.visible = false;
     this.placeAtStart();
     const token = ++this.token;
@@ -208,8 +158,8 @@ export class SequenceChapter {
     const name = this.robot.name;
     let msg = reason === 'edge' ? phrases.edge(name)
       : reason === 'bump' ? phrases.bump(name)
-      : reason === 'passed' ? phrases.passed(name, this.goalName)
-      : phrases.notThere(name, this.goalName);
+      : reason === 'passed' ? phrases.passed(name, GOAL_NAME)
+      : phrases.notThere(name, GOAL_NAME);
     if (this.fails >= 2 && this.level.hint) msg += ' Suggerimento: ' + this.level.hint;
     this.robot.sad();
     this.game.say(msg);
@@ -218,11 +168,11 @@ export class SequenceChapter {
   async win() {
     this.setRunning(false);
     sfx.win();
-    const { board } = this.game;
+    this.game.levelCompleted(this.index);
     this.game.confettiAt(this.robot.group);
     let msg = phrases.win();
     const target = this.level.target;
-    if (target && !this.debug) {
+    if (target) {
       if (this.cards.length <= target) {
         msg += ` Super! Hai usato solo ${this.cards.length} carte: programma cortissimo!`;
         sfx.star();
@@ -230,10 +180,11 @@ export class SequenceChapter {
         msg += ` Hai usato ${this.cards.length} carte. Sfida: riesci a usarne solo ${target}? Oppure premi Avanti.`;
       }
     }
+    msg += this.index + 1 < LEVELS.length ? ' Premi Avanti per il prossimo livello!' : ' Premi Avanti per la festa finale!';
     this.nextBtn.visible = true;
     this.game.say(msg);
     const token = this.token;
-    await Promise.all([board.collectGoal(), this.robot.turnToDir(DIRS.S, 0.3)]);
+    await Promise.all([this.game.board.collectGoal(), this.robot.turnToDir(DIRS.S, 0.3)]);
     if (token !== this.token) return;
     await this.robot.celebrate();
   }
@@ -241,12 +192,12 @@ export class SequenceChapter {
   next() {
     this.token++;
     clearTweens();
-    this.game.nextLevel(this.chapterId, this.levelIndex);
+    this.game.nextLevel(this.index);
   }
 
   exit() {
     this.token++;
     clearTweens();
-    this.game.goChapters();
+    this.game.goMenu();
   }
 }

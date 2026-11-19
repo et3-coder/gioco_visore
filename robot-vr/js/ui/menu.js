@@ -1,12 +1,11 @@
-// Menu iniziale (scelta dell'età) e scelta del capitolo.
-import { makeButton, makeLabel } from './ui.js';
+// Menu iniziale: pulsante "Gioca" (riparte dall'ultimo livello sbloccato) e scelta dei livelli già sbloccati.
+import { makeButton } from './ui.js';
 import { icons } from './icons.js';
-import { AGES, CHAPTERS } from '../levels.js';
+import { LEVELS, DIRS } from '../levels.js';
 import { LAYOUT } from './layout.js';
 import { isVoiceEnabled, setVoiceEnabled, speak } from '../hints.js';
-import { DIRS } from '../levels.js';
 
-function voiceButton(game) {
+function voiceButton() {
   const b = makeButton(0.4, 0.13, isVoiceEnabled() ? 'Voce: sì' : 'Voce: no', () => {
     setVoiceEnabled(!isVoiceEnabled());
     b.userData.setText(isVoiceEnabled() ? 'Voce: sì' : 'Voce: no');
@@ -28,41 +27,35 @@ export function showMainMenu(game) {
   const scr = game.screen;
   scr.clear();
   welcomeBoard(game);
-  game.buildHeader("L'avventura dei tre amici: impara a programmare con EMO, Loona e AIBI");
-  const colors = ['#ffb020', '#2fbf71', '#4d8dff'];
-  AGES.forEach((a, i) => {
-    const b = makeButton(0.56, 0.2, a.label, () => {
-      game.age = a.id;
-      game.goChapters();
-    }, { color: colors[i], size: 80 });
-    scr.add(b, (i - 1) * 0.66, LAYOUT.track - 0.02);
-  });
-  const note = makeLabel(2.0, 0.12,
-    'Per gli adulti: Meta consiglia i visori dai 10 anni in su. Con i bambini più piccoli fate partite brevi (10-15 minuti) e restate sempre vicini.',
-    { size: 30, color: '#7a7391', weight: '600' });
-  scr.add(note, 0, LAYOUT.palette - 0.04);
-  scr.add(voiceButton(game), -0.35, LAYOUT.buttons);
-  if (game.mode === 'ar') {
-    scr.add(makeButton(0.48, 0.13, 'Sposta il gioco', () => game.startPlacement(), { color: '#8a7fb0', size: 46 }), 0.2, LAYOUT.buttons);
-  } else {
-    scr.add(makeButton(0.48, 0.13, 'Centra la scena', () => game.recenter(), { color: '#8a7fb0', size: 46 }), 0.2, LAYOUT.buttons);
-  }
-  game.say('Ciao! Io sono AIBI. Insieme a EMO e Loona impareremo a programmare i robot! Quanti anni hai? Tocca un pulsante.');
-}
+  game.buildHeader("L'avventura di EMO: impara a programmare un robot");
 
-export function showChapterMenu(game) {
-  const scr = game.screen;
-  scr.clear();
-  welcomeBoard(game);
-  const ageLabel = AGES.find((a) => a.id === game.age).label;
-  game.buildHeader(`Scegli un'avventura  ·  Età: ${ageLabel}`);
-  const colors = ['#ff8a3d', '#4d8dff', '#9b5cff'];
-  const robots = ['con EMO', 'con Loona', 'con AIBI'];
-  CHAPTERS.forEach((c, i) => {
-    const b = makeButton(0.68, 0.32, `${c.id}. ${c.title}\n${c.concept} (${robots[i]})`, () => game.startChapter(c.id, 0), { color: colors[i], size: 50 });
-    scr.add(b, (i - 1) * 0.74, LAYOUT.track - 0.06);
-  });
-  scr.add(makeButton(0.44, 0.13, 'Festa finale', () => game.finale(), { color: '#ff3fa4', icon: icons.star, size: 48 }), 0.3, LAYOUT.buttons + 0.03);
-  scr.add(makeButton(0.4, 0.13, 'Cambia età', () => game.goMenu(), { color: '#8a7fb0', icon: icons.back, size: 48 }), -0.3, LAYOUT.buttons + 0.03);
-  game.say('Scegli un\'avventura! Ti consiglio di iniziare dalla prima, con EMO.');
+  const unlocked = game.unlocked; // numero di livelli sbloccati
+  const next = Math.min(unlocked, LEVELS.length) - 1;
+  const play = makeButton(0.86, 0.2, unlocked > 1 ? `Gioca! (livello ${next + 1})` : 'Gioca!', () => game.startLevel(next), { color: '#2fbf71', icon: icons.play, size: 72 });
+  scr.add(play, -0.46, LAYOUT.track + 0.01);
+  const stage = makeButton(0.72, 0.2, 'Il palco', () => game.startStage(), { color: '#ff4fa3', icon: icons.star, size: 72 });
+  scr.add(stage, 0.42, LAYOUT.track + 0.01);
+
+  // Livelli: quelli sbloccati si possono rigiocare, gli altri sono grigi
+  const n = LEVELS.length;
+  const size = 0.135, step = 0.155;
+  const x0 = -((n - 1) * step) / 2;
+  for (let i = 0; i < n; i++) {
+    const open = i < unlocked;
+    const b = makeButton(size, size, String(i + 1), () => game.startLevel(i), { color: i < unlocked - 1 ? '#ffb020' : '#4d8dff', size: 64 });
+    b.userData.setEnabled(open);
+    scr.add(b, x0 + i * step, LAYOUT.palette);
+  }
+
+  scr.add(voiceButton(), -0.5, LAYOUT.buttons);
+  if (game.mode === 'ar') {
+    scr.add(makeButton(0.48, 0.13, 'Sposta il gioco', () => game.startPlacement(), { color: '#8a7fb0', size: 46 }), 0.02, LAYOUT.buttons);
+  } else {
+    scr.add(makeButton(0.48, 0.13, 'Centra la scena', () => game.recenter(), { color: '#8a7fb0', size: 46 }), 0.02, LAYOUT.buttons);
+  }
+  scr.add(makeButton(0.46, 0.13, 'Ricomincia', () => { game.resetProgress(); showMainMenu(game); }, { color: '#ff7a59', icon: icons.undo, size: 46 }), 0.55, LAYOUT.buttons);
+
+  game.say(unlocked > 1
+    ? `Eccoti di nuovo! Premi Gioca per continuare dal livello ${next + 1}, oppure scegli un livello qui sotto.`
+    : 'Ciao! Io sono AIBI. Aiutiamo EMO a ritrovare le sue note? Ogni livello è un po\' più difficile del precedente. Premi Gioca! Oppure sali sul palco e inventa uno spettacolo.');
 }

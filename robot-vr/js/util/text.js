@@ -124,6 +124,60 @@ export function drawIcon(ctx, kind, cx, cy, s) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(n, cx, cy + s * 0.05);
+  } else if (kind === 'DANCE') {
+    // omino che balla con le braccia in alto
+    ctx.lineWidth = s * 0.16;
+    ctx.beginPath(); ctx.arc(cx + s * 0.1, cy - s * 0.62, s * 0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx + s * 0.05, cy - s * 0.35); ctx.lineTo(cx - s * 0.08, cy + s * 0.25); // corpo
+    ctx.moveTo(cx + s * 0.02, cy - s * 0.2); ctx.lineTo(cx - s * 0.55, cy - s * 0.65); // braccio sx
+    ctx.moveTo(cx + s * 0.02, cy - s * 0.2); ctx.lineTo(cx + s * 0.6, cy - s * 0.5); // braccio dx
+    ctx.moveTo(cx - s * 0.08, cy + s * 0.25); ctx.lineTo(cx - s * 0.5, cy + s * 0.85); // gamba sx
+    ctx.moveTo(cx - s * 0.08, cy + s * 0.25); ctx.lineTo(cx + s * 0.35, cy + s * 0.55); ctx.lineTo(cx + s * 0.3, cy + s * 0.9); // gamba dx
+    ctx.stroke();
+  } else if (kind === 'JUMP') {
+    // arco con freccia sopra una linea (salto)
+    ctx.lineWidth = s * 0.2;
+    ctx.beginPath(); ctx.moveTo(cx - s * 0.85, cy + s * 0.8); ctx.lineTo(cx + s * 0.85, cy + s * 0.8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - s * 0.6, cy + s * 0.5); ctx.quadraticCurveTo(cx, cy - s * 1.1, cx + s * 0.45, cy + s * 0.25); ctx.stroke();
+    arrowHead(ctx, cx + s * 0.55, cy + s * 0.45, Math.PI * 0.35, s * 0.36);
+  } else if (kind === 'SPIN') {
+    // freccia circolare quasi completa con un puntino al centro
+    ctx.lineWidth = s * 0.2;
+    ctx.beginPath(); ctx.arc(cx, cy, s * 0.68, -Math.PI * 0.1, Math.PI * 1.6); ctx.stroke();
+    const a = -Math.PI * 0.1;
+    arrowHead(ctx, cx + Math.cos(a) * s * 0.68, cy + Math.sin(a) * s * 0.68, a + Math.PI / 2, s * 0.36);
+    ctx.beginPath(); ctx.arc(cx, cy, s * 0.18, 0, Math.PI * 2); ctx.fill();
+  } else if (kind === 'BOW') {
+    // figura che si inchina
+    ctx.lineWidth = s * 0.18;
+    ctx.beginPath(); ctx.arc(cx + s * 0.55, cy - s * 0.05, s * 0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx + s * 0.32, cy); ctx.lineTo(cx - s * 0.3, cy - s * 0.35); // schiena piegata
+    ctx.lineTo(cx - s * 0.3, cy + s * 0.85); // gambe
+    ctx.moveTo(cx + s * 0.05, cy - s * 0.15); ctx.lineTo(cx + s * 0.2, cy + s * 0.45); // braccio
+    ctx.stroke();
+  } else if (kind === 'TALK') {
+    // fumetto
+    roundRect(ctx, cx - s * 0.85, cy - s * 0.7, s * 1.7, s * 1.1, s * 0.35);
+    ctx.fill();
+    ctx.beginPath(); ctx.moveTo(cx - s * 0.4, cy + s * 0.3); ctx.lineTo(cx - s * 0.55, cy + s * 0.85); ctx.lineTo(cx, cy + s * 0.35); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    for (const dx of [-0.45, 0, 0.45]) { ctx.beginPath(); ctx.arc(cx + dx * s, cy - s * 0.15, s * 0.12, 0, Math.PI * 2); ctx.fill(); }
+  } else if (kind === 'MUSIC') {
+    // due note unite
+    ctx.lineWidth = s * 0.14;
+    ctx.beginPath(); ctx.ellipse(cx - s * 0.5, cy + s * 0.55, s * 0.25, s * 0.18, -0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx + s * 0.45, cy + s * 0.4, s * 0.25, s * 0.18, -0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(cx - s * 0.28, cy + s * 0.5); ctx.lineTo(cx - s * 0.28, cy - s * 0.65); ctx.moveTo(cx + s * 0.67, cy + s * 0.35); ctx.lineTo(cx + s * 0.67, cy - s * 0.8); ctx.stroke();
+    ctx.lineWidth = s * 0.24;
+    ctx.beginPath(); ctx.moveTo(cx - s * 0.28, cy - s * 0.6); ctx.lineTo(cx + s * 0.67, cy - s * 0.75); ctx.stroke();
+  } else if (kind === 'HAPPY') {
+    // faccina sorridente
+    ctx.lineWidth = s * 0.14;
+    ctx.beginPath(); ctx.arc(cx, cy, s * 0.82, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx - s * 0.3, cy - s * 0.22, s * 0.11, 0, Math.PI * 2); ctx.arc(cx + s * 0.3, cy - s * 0.22, s * 0.11, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy + s * 0.05, s * 0.45, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
   } else if (kind === 'END') {
     ctx.lineWidth = s * 0.22;
     ctx.beginPath();
@@ -149,6 +203,14 @@ export const CARD_INFO = {
   REP4: { color: '#9b5cff', label: 'ripeti 4' },
   REP5: { color: '#9b5cff', label: 'ripeti 5' },
   END: { color: '#c08bff', label: 'fine ripeti' },
+  // carte del palco
+  DANCE: { color: '#ff4fa3', label: 'balla' },
+  JUMP: { color: '#16b5a8', label: 'salta' },
+  SPIN: { color: '#f08a24', label: 'giravolta' },
+  BOW: { color: '#6f7dff', label: 'inchino' },
+  TALK: { color: '#2e9cf0', label: 'parla' },
+  MUSIC: { color: '#e0a100', label: 'musica' },
+  HAPPY: { color: '#e6b800', label: 'felici' },
 };
 
 const cardTexCache = new Map();

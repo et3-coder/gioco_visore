@@ -8,19 +8,18 @@ import { icons } from './ui/icons.js';
 import { LAYOUT } from './ui/layout.js';
 import { roundRect, drawTextBlock, makeCanvas, texFromCanvas } from './util/text.js';
 import { updateTweens, clearTweens } from './util/tween.js';
-import { Board, buildTable, TABLE_TOP, BOARD_Z } from './game/board.js';
+import { Board, buildTable, TABLE_TOP, BOARD_Z, BOARD_MAX } from './game/board.js';
 import { Emo } from './robots/emo.js';
 import { Loona } from './robots/loona.js';
 import { Aibi } from './robots/aibi.js';
 import { loadRobotModels } from './robots/models.js';
-import { DIR_VEC, DIRS, LEVELS } from './levels.js';
-import { showMainMenu, showChapterMenu } from './ui/menu.js';
-import { createChapter1 } from './chapters/ch1-emo.js';
-import { createChapter2 } from './chapters/ch2-loona.js';
-import { createChapter3 } from './chapters/ch3-aibi.js';
+import { DIR_VEC, DIRS, LEVELS } from './levels.js'; // LEVELS = elenco dei livelli in ordine di difficoltà
+import { showMainMenu } from './ui/menu.js';
+import { Level } from './game/level.js';
+import { Stage } from './game/stage.js';
 import { speak } from './hints.js';
 import { confetti, updateEffects } from './effects.js';
-import { sfx } from './audio.js';
+import { sfx, music } from './audio.js';
 
 const DESIGN_EYE = 1.25; // altezza degli occhi per cui è pensata la scena (bambino in piedi)
 
@@ -40,8 +39,8 @@ scene.background = SKY;
 
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 60);
 function placeDesktopCamera() {
-  camera.position.set(0, 1.52, 0.85);
-  camera.lookAt(0, 1.1, -1.1);
+  camera.position.set(0, 1.66, 1.0);
+  camera.lookAt(0, 1.08, -1.15);
 }
 placeDesktopCamera();
 
@@ -141,12 +140,12 @@ buildTable(vrOnly);
 
 // Podio di AIBI, a sinistra del tavolo
 const podium = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.9, 24), new THREE.MeshStandardMaterial({ color: 0xffb3c7, roughness: 0.6 }));
-podium.position.set(-0.78, 0.45, -0.6);
+podium.position.set(-0.98, 0.45, -0.5);
 vrOnly.add(podium);
 
 // Tovaglietta semitrasparente sotto il tabellone (solo realtà mista)
 const placemat = new THREE.Mesh(
-  new RoundedBoxGeometry(1.02, 0.004, 1.0, 2, 0.002),
+  new RoundedBoxGeometry(BOARD_MAX + 0.1, 0.004, BOARD_MAX + 0.1, 2, 0.002),
   new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, roughness: 1 })
 );
 placemat.position.set(0, TABLE_TOP + 0.002, BOARD_Z);
@@ -166,7 +165,7 @@ function applyLayout(mode) {
   const aibi = robots.aibi.group;
   if (ar) {
     // Schermo più piccolo e vicino, sospeso sopra il bordo lontano del tabellone
-    screen.group.position.set(0, TABLE_TOP + 0.56, BOARD_Z - 0.55);
+    screen.group.position.set(0, TABLE_TOP + 0.62, BOARD_Z - BOARD_MAX / 2 - 0.12);
     screen.group.rotation.set(-0.18, 0, 0);
     screen.group.scale.setScalar(0.7);
     // AIBI seduto sull'angolo in alto a sinistra dello schermo
@@ -175,13 +174,14 @@ function applyLayout(mode) {
     aibi.scale.setScalar(2.2);
     robots.aibi.pivot.rotation.y = 0.35;
   } else {
-    screen.group.position.set(0, 1.42, -1.75);
+    // Schermo dietro il tavolo, un po' più grande perché il tavolo è più profondo
+    screen.group.position.set(0, 1.52, -2.0);
     screen.group.rotation.set(0, 0, 0);
-    screen.group.scale.setScalar(1);
+    screen.group.scale.setScalar(1.1);
     world.add(aibi);
-    aibi.position.set(-0.78, 0.9, -0.6);
+    aibi.position.set(-0.98, 0.9, -0.5);
     aibi.scale.setScalar(2);
-    robots.aibi.pivot.rotation.y = Math.atan2(0.78, 0.6);
+    robots.aibi.pivot.rotation.y = Math.atan2(0.98, 0.5);
   }
 }
 applyLayout('vr');
@@ -189,10 +189,20 @@ applyLayout('vr');
 const pointers = new Pointers(renderer, camera, scene, [screen.group]);
 
 // ---------- Oggetto "game": tiene insieme tutto ----------
+const PROGRESS_KEY = 'robot-vr-livelli-sbloccati';
+function loadProgress() {
+  try {
+    const v = parseInt(localStorage.getItem(PROGRESS_KEY), 10);
+    return Number.isFinite(v) ? Math.min(LEVELS.length, Math.max(1, v)) : 1;
+  } catch (e) {
+    return 1;
+  }
+}
+
 const game = {
-  age: 'mid',
+  unlocked: loadProgress(), // livelli sbloccati (almeno il primo)
   mode: 'desktop', // 'desktop' | 'vr' | 'ar'
-  view: 'main', // schermata attuale: 'main' | 'chapters' | 'chapter' | 'finale'
+  view: 'main', // schermata attuale: 'main' | 'level' | 'finale'
   screen,
   board,
   robots,
@@ -270,8 +280,19 @@ const game = {
 
   leaveCurrent() {
     if (this.current) this.current.token++;
+    const wasStage = this.current && this.current.isStage;
     this.current = null;
     clearTweens();
+    music.stop(0.3); // la musica dei balletti si ferma quando si cambia schermata
+    if (wasStage) {
+      // AIBI torna al suo posto (piedistallo in VR, angolo dello schermo in realtà mista)
+      const a = robots.aibi;
+      a.stopDance();
+      a.acting = false;
+      a.body.position.set(0, 0, 0);
+      a.body.rotation.set(0, 0, 0);
+      applyLayout(this.mode === 'ar' ? 'ar' : 'vr');
+    }
     if (this.finaleOn) {
       this.finaleOn = false;
       for (const r of Object.values(robots)) r.stopDance();
@@ -284,26 +305,38 @@ const game = {
     showMainMenu(this);
   },
 
-  goChapters() {
+  startLevel(index) {
     this.leaveCurrent();
-    this.view = 'chapters';
-    showChapterMenu(this);
-  },
-
-  startChapter(id, levelIndex) {
-    this.leaveCurrent();
-    this.view = 'chapter';
-    const create = { 1: createChapter1, 2: createChapter2, 3: createChapter3 }[id];
-    this.current = create(this, levelIndex);
+    this.view = 'level';
+    this.current = new Level(this, index);
     this.current.start();
   },
 
-  nextLevel(chapterId, levelIndex) {
-    const count = LEVELS[chapterId][this.age].length;
-    if (levelIndex + 1 < count) this.startChapter(chapterId, levelIndex + 1);
-    else if (chapterId < 3) {
-      this.startChapter(chapterId + 1, 0);
-    } else this.finale();
+  // Il palco: modalità creativa con le carte azione
+  startStage() {
+    this.leaveCurrent();
+    this.view = 'stage';
+    this.current = new Stage(this);
+    this.current.start();
+  },
+
+  nextLevel(index) {
+    if (index + 1 < LEVELS.length) this.startLevel(index + 1);
+    else this.finale();
+  },
+
+  // Progressi: quanti livelli sono sbloccati (salvato nel browser del visore)
+  levelCompleted(index) {
+    const u = Math.min(LEVELS.length, Math.max(this.unlocked, index + 2));
+    if (u !== this.unlocked) {
+      this.unlocked = u;
+      try { localStorage.setItem(PROGRESS_KEY, String(u)); } catch (e) { /* salvataggio non disponibile */ }
+    }
+  },
+
+  resetProgress() {
+    this.unlocked = 1;
+    try { localStorage.removeItem(PROGRESS_KEY); } catch (e) { /* niente */ }
   },
 
   finale() {
@@ -315,15 +348,19 @@ const game = {
     this.placeRobot(robots.emo, 1, 1, DIRS.S);
     this.placeRobot(robots.loona, 3, 1, DIRS.S);
     for (const r of Object.values(robots)) r.startDance();
+    music.start(); // musica per la festa
     this.finaleOn = true;
     this.finaleTimer = 0;
     this.buildHeader('Festa finale!');
     const big = makeLabel(1.9, 0.2, 'Complimenti! Ora sai programmare i robot!', { size: 80, color: '#ff3fa4' });
     screen.add(big, 0, LAYOUT.track);
-    screen.add(makeButton(0.5, 0.14, 'Gioca ancora', () => this.goChapters(), { color: '#2fbf71', icon: icons.play, size: 52 }), -0.3, LAYOUT.buttons);
+    screen.add(makeButton(0.5, 0.14, 'Gioca ancora', () => this.goMenu(), { color: '#2fbf71', icon: icons.play, size: 52 }), -0.3, LAYOUT.buttons);
     screen.add(makeButton(0.38, 0.14, 'Menu', () => this.goMenu(), { color: '#8a7fb0', icon: icons.home, size: 52 }), 0.2, LAYOUT.buttons);
     sfx.win();
-    this.say('Evviva! Hai aiutato EMO a trovare le note, Loona a trovare l\'osso e me a correggere i miei errori. Facciamo festa tutti insieme!');
+    this.say('Evviva! Hai superato tutti i livelli e aiutato EMO a ritrovare tutte le sue note. Facciamo festa tutti insieme!');
+    // musica più bassa mentre AIBI parla, poi a tutto volume
+    setTimeout(() => music.duck(true), 450);
+    setTimeout(() => music.duck(false), 7000);
   },
 
   // Porta la scena davanti al giocatore (posizione e direzione dello sguardo attuali)
@@ -331,7 +368,7 @@ const game = {
     if (!renderer.xr.isPresenting) return;
     const xrCam = renderer.xr.getCamera();
     const head = new THREE.Vector3().setFromMatrixPosition(xrCam.matrixWorld);
-    if (head.y < 0.4) return; // tracciamento non ancora pronto
+    if (head.lengthSq() === 0) return; // tracciamento non ancora pronto
     const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(new THREE.Quaternion().setFromRotationMatrix(xrCam.matrixWorld));
     const yaw = Math.atan2(-dir.x, -dir.z);
     world.rotation.set(0, yaw, 0);
@@ -353,23 +390,44 @@ const placement = new Placement(renderer, scene, world, (msg) => {
 pointers.onMissSelect = () => placement.onSelect();
 
 // ---------- Avvio delle sessioni VR / realtà mista ----------
-const SESSION_INIT = {
-  vr: { optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'] },
-  ar: { requiredFeatures: ['local-floor'], optionalFeatures: ['hit-test', 'plane-detection', 'anchors', 'hand-tracking'] },
+// Richieste da provare in ordine: se il visore/browser ne rifiuta una ("session configuration is not supported"),
+// si riprova con una più semplice. ref = tipo di spazio di riferimento ('local-floor' = sa dov'è il pavimento).
+const SESSION_ATTEMPTS = {
+  vr: [
+    { init: { optionalFeatures: ['local-floor', 'hand-tracking'] }, ref: 'local-floor' },
+    { init: { optionalFeatures: ['local-floor'] }, ref: 'local-floor' },
+    { init: {}, ref: 'local' },
+  ],
+  ar: [
+    { init: { requiredFeatures: ['local-floor'], optionalFeatures: ['hit-test', 'plane-detection', 'anchors', 'hand-tracking'] }, ref: 'local-floor' },
+    { init: { optionalFeatures: ['local-floor', 'hit-test'] }, ref: 'local-floor' },
+    { init: { optionalFeatures: ['hit-test'] }, ref: 'local' },
+    { init: {}, ref: 'local' },
+  ],
 };
 
 async function startSession(mode) {
   if (renderer.xr.isPresenting || !navigator.xr) return;
   sfx.unlock();
-  try {
-    const session = await navigator.xr.requestSession(mode === 'ar' ? 'immersive-ar' : 'immersive-vr', SESSION_INIT[mode]);
-    session.addEventListener('end', onSessionEnded);
-    await renderer.xr.setSession(session);
-    onSessionStarted(mode);
-  } catch (e) {
-    console.error(e);
-    alert('Non riesco ad avviare la modalità ' + (mode === 'ar' ? 'realtà mista' : 'VR') + ': ' + e.message);
+  const type = mode === 'ar' ? 'immersive-ar' : 'immersive-vr';
+  let lastError = null;
+  for (const attempt of SESSION_ATTEMPTS[mode]) {
+    let session = null;
+    try {
+      session = await navigator.xr.requestSession(type, attempt.init);
+      renderer.xr.setReferenceSpaceType(attempt.ref);
+      await renderer.xr.setSession(session);
+      session.addEventListener('end', onSessionEnded);
+      onSessionStarted(mode);
+      return;
+    } catch (e) {
+      console.warn(`Avvio ${type} non riuscito con`, attempt, e);
+      lastError = e;
+      if (session) { try { await session.end(); } catch (e2) { /* già chiusa */ } }
+    }
   }
+  alert('Non riesco ad avviare la modalità ' + (mode === 'ar' ? 'realtà mista' : 'VR') + ': ' + (lastError && lastError.message) +
+    '\n\nControlla di aver aperto la pagina nel Browser del Quest (non dentro un\'altra app).');
 }
 
 function onSessionStarted(mode) {

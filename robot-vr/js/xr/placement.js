@@ -1,7 +1,7 @@
 // Realtà mista: il bambino punta il controller su un tavolo vero e preme il grilletto
 // per appoggiarci sopra tabellone e robot (WebXR hit-test).
 import * as THREE from 'three';
-import { TABLE_TOP, BOARD_Z } from '../game/board.js';
+import { TABLE_TOP, BOARD_Z, BOARD_MAX } from '../game/board.js';
 import { makeLabel } from '../ui/ui.js';
 import { speak } from '../hints.js';
 import { sfx } from '../audio.js';
@@ -28,7 +28,7 @@ export class Placement {
     );
     ring.rotation.x = -Math.PI / 2;
     const ghost = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.92, 0.92),
+      new THREE.PlaneGeometry(BOARD_MAX, BOARD_MAX),
       new THREE.MeshBasicMaterial({ color: 0x9b5cff, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false })
     );
     ghost.rotation.x = -Math.PI / 2;

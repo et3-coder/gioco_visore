@@ -1,6 +1,6 @@
 // Classe base dei robot: movimento, rotazione, urti, festeggiamenti.
 import * as THREE from 'three';
-import { animate, ease } from '../util/tween.js';
+import { animate, ease, wait } from '../util/tween.js';
 import { makeCanvas, texFromCanvas } from '../util/text.js';
 import { normalizeModel } from './models.js';
 
@@ -181,6 +181,40 @@ export class Robot {
     this.moving = false;
   }
 
+  // ---- Azioni del palco ----
+  async danceFor(seconds = 1.8) {
+    this.startDance();
+    await wait(seconds);
+    this.stopDance();
+  }
+
+  async jump() {
+    this.acting = true;
+    this.face && this.face.set('surprised', 0.8);
+    await animate(0.55, (t, raw) => { this.body.position.y = Math.sin(raw * Math.PI) * 0.07; }, ease.linear);
+    this.body.position.y = 0;
+    this.acting = false;
+  }
+
+  async spin() {
+    this.acting = true;
+    this.face && this.face.set('happy', 1);
+    const start = this.pivot.rotation.y;
+    await animate(0.9, (t) => { this.pivot.rotation.y = start + t * Math.PI * 2; });
+    this.pivot.rotation.y = start;
+    this.acting = false;
+  }
+
+  async bow() {
+    this.acting = true;
+    this.face && this.face.set('happy', 1.4);
+    await animate(0.45, (t) => { this.body.rotation.x = t * 0.45; });
+    await wait(0.3);
+    await animate(0.45, (t) => { this.body.rotation.x = (1 - t) * 0.45; });
+    this.body.rotation.x = 0;
+    this.acting = false;
+  }
+
   async sad() {
     this.face && this.face.set('sad', 2.5);
     await animate(0.5, (t, raw) => { this.body.rotation.x = Math.sin(raw * Math.PI) * 0.2; });
@@ -201,7 +235,7 @@ export class Robot {
       this.body.position.y = Math.abs(Math.sin(time * 6)) * 0.03;
       this.body.rotation.z = Math.sin(time * 6) * 0.18;
       this.body.rotation.y = Math.sin(time * 3) * 0.4;
-    } else if (!this.moving) {
+    } else if (!this.moving && !this.acting) {
       if (this.talkTime > 0) {
         this.talkTime -= dt;
         if (!this.ownTalk) this.body.position.y = Math.abs(Math.sin(time * 9)) * 0.012;

@@ -5,7 +5,9 @@ import { disposeTree } from '../ui/ui.js';
 import { animate } from '../util/tween.js';
 
 export const TABLE_TOP = 0.82;
-export const BOARD_Z = -0.85;
+export const BOARD_Z = -0.95; // centro del tabellone (davanti al giocatore, al centro del tavolo)
+export const BOARD_MAX = 1.2; // lato massimo del tabellone in metri
+const CELL_MAX = 0.22; // casella più grande possibile (griglie piccole)
 
 export const TILE_COLORS = {
   red: 0xff5d5d,
@@ -19,12 +21,12 @@ function m(color, opts = {}) {
 
 export function buildTable(parent) {
   const g = new THREE.Group();
-  const top = new THREE.Mesh(new RoundedBoxGeometry(1.14, 0.05, 1.04, 3, 0.02), m(0xffe2a8));
+  const top = new THREE.Mesh(new RoundedBoxGeometry(BOARD_MAX + 0.22, 0.05, BOARD_MAX + 0.18, 3, 0.02), m(0xffe2a8));
   top.position.set(0, TABLE_TOP - 0.025, BOARD_Z);
   g.add(top);
   const legMat = m(0x7a5cff);
-  for (const x of [-0.5, 0.5]) {
-    for (const z of [-0.42, 0.42]) {
+  for (const x of [-0.64, 0.64]) {
+    for (const z of [-0.6, 0.6]) {
       const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, TABLE_TOP - 0.05, 14), legMat);
       leg.position.set(x, (TABLE_TOP - 0.05) / 2, BOARD_Z + z);
       g.add(leg);
@@ -115,7 +117,7 @@ export class Board {
     const [W, H] = level.size;
     this.W = W;
     this.H = H;
-    this.cell = Math.min(0.17, 0.9 / Math.max(W, H));
+    this.cell = Math.min(CELL_MAX, BOARD_MAX / Math.max(W, H));
     const cs = this.cell;
     this.walls = new Set((level.walls || []).map(([x, z]) => `${x},${z}`));
     this.colors = new Map((level.colors || []).map(([x, z, c]) => [`${x},${z}`, c]));
