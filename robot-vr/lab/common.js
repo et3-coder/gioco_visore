@@ -7,6 +7,7 @@ import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFa
 export { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 export { THREE };
 import { setupCoding } from './coding.js';
+import { setupLook, HATS, HAT_NAMES, CAPES, CAPE_NAMES, BODY_COLORS, ACCENT_COLORS } from './look.js';
 
 /* ---------- utilità ---------- */
 export const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
@@ -165,6 +166,52 @@ function synth(ac, out) {
   };
   return { note, drum, noise };
 }
+// fusa (carezza), "wiii" (lancio), tonfo (atterraggio)
+export function purr() {
+  const ac = audio(), out = ac.createGain(); out.gain.value = 0.35; out.connect(ac.destination);
+  const t = ac.currentTime, o = ac.createOscillator(), lfo = ac.createOscillator(), lg = ac.createGain(), g = ac.createGain();
+  o.type = 'triangle'; o.frequency.value = 90; lfo.frequency.value = 22; lg.gain.value = 0.25;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.3, t + 0.1); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+  lfo.connect(lg).connect(g.gain); o.connect(g).connect(out); o.start(t); lfo.start(t); o.stop(t + 1); lfo.stop(t + 1);
+  const { note } = synth(ac, out); note(84, t + 0.05, 0.15, 'sine', 0.15); note(88, t + 0.17, 0.2, 'sine', 0.15);
+}
+export function whee() {
+  const ac = audio(), o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime;
+  o.frequency.setValueAtTime(380, t); o.frequency.exponentialRampToValueAtTime(1300, t + 0.45);
+  g.gain.setValueAtTime(0.12, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+  o.connect(g).connect(ac.destination); o.start(t); o.stop(t + 0.55);
+}
+export function thud(k = 1) {
+  const ac = audio(), out = ac.createGain(); out.gain.value = 0.2 + 0.4 * Math.min(1, k); out.connect(ac.destination);
+  synth(ac, out).drum(ac.currentTime, 120, 40, 0.25, 0.9);
+}
+
+/* ---------- cuoricini (carezze) ---------- */
+let heartTex = null;
+const hearts = [];
+export function heartsAt(scene, pos, n = 7) {
+  if (!heartTex) {
+    const { g, tex } = canvasTex(64, 64);
+    g.fillStyle = '#ff4f8b'; g.beginPath(); g.moveTo(32, 56);
+    g.bezierCurveTo(-8, 30, 12, 0, 32, 18); g.bezierCurveTo(52, 0, 72, 30, 32, 56); g.fill();
+    heartTex = tex;
+  }
+  for (let i = 0; i < n; i++) {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: heartTex, transparent: true, depthWrite: false }));
+    s.scale.setScalar(0.08 + Math.random() * 0.06);
+    s.position.copy(pos).add(new THREE.Vector3((Math.random() - 0.5) * 0.3, Math.random() * 0.1, (Math.random() - 0.5) * 0.3));
+    s.userData = { v: new THREE.Vector3((Math.random() - 0.5) * 0.2, 0.45 + Math.random() * 0.3, (Math.random() - 0.5) * 0.2), life: 1.4 };
+    scene.add(s); hearts.push(s);
+  }
+}
+function updateHearts(dt) {
+  for (let i = hearts.length - 1; i >= 0; i--) {
+    const s = hearts[i]; s.userData.life -= dt;
+    s.position.addScaledVector(s.userData.v, dt); s.material.opacity = Math.max(0, s.userData.life / 1.4);
+    if (s.userData.life <= 0) { s.parent.remove(s); s.material.dispose(); hearts.splice(i, 1); }
+  }
+}
+
 export function stopMusic() {
   if (!music) return;
   const g = music; music = null;
@@ -231,13 +278,14 @@ export function hand(mat) {
 /* ======================================================================
    startLab: costruisce la stanza, il robot, i pulsanti e il visore
    ====================================================================== */
-export function startLab(RobotClass, { name, color, program = [] }) {
+export function startLab(RobotClass, { name, color, program = [], look: lookCfg = null }) {
   const css = '#' + new THREE.Color(color).getHexString();
   document.documentElement.style.setProperty('--c', css);
   document.body.insertAdjacentHTML('beforeend', `
     <a id="back" href="index.html">← Tutti i robot</a>
     <div id="title">🤖 ${name}</div>
-    <div id="tools"><button id="bCode">🧩 Programma</button><button id="bVoice">🔊 Voce</button><button id="bView">🎥 Vista</button></div>
+    <div id="tools"><button id="bLook">🎨 Personalizza</button><button id="bCode">🧩 Programma</button><button id="bVoice">🔊 Voce</button><button id="bView">🎥 Vista</button></div>
+    <div id="hint">👆 Tocca ${name} per fargli le coccole, trascinalo per lanciarlo!</div>
     <div class="panel"><div class="btns"></div></div>`);
 
   const SHOT = new URLSearchParams(location.search).has('shot'); // solo per test automatici
@@ -350,7 +398,11 @@ export function startLab(RobotClass, { name, color, program = [] }) {
       camera.aspect = (innerWidth - cw) / innerHeight; camera.updateProjectionMatrix();
     },
   };
-  const robot = new RobotClass(nav, lab);
+  // "thrower" avvolge il robot: serve per prenderlo e lanciarlo senza disturbare le sue animazioni.
+  // Quando è a casa ha posizione e rotazione zero.
+  const thrower = new THREE.Group(); nav.add(thrower);
+  const robot = new RobotClass(thrower, lab);
+  const look = lookCfg ? setupLook(robot, lookCfg, name) : null;
   const coding = setupCoding({ robot, name, color: css, program, lab });
   // aprendo i blocchi la telecamera si allontana per vedere dove cammina il robot
   document.getElementById('bCode').onclick = () => {
@@ -371,28 +423,167 @@ export function startLab(RobotClass, { name, color, program = [] }) {
   document.getElementById('bView').onclick = e => {
     viewIdx = (viewIdx + 1) % VIEWS.length; setView(viewIdx); e.target.textContent = '🎥 ' + VIEWS[viewIdx].name;
   };
-  // clic sul robot = saluta
+  /* ======================================================================
+     Toccare, prendere e lanciare il robot (torna sempre da solo alla pedana)
+     ====================================================================== */
+  const PET_LINES = ['Che bello!', 'Ancora, ancora!', 'Mi fai il solletico!', 'Ti voglio bene!', 'Che coccole!'];
+  const GRAB_LINES = ['Ehi! Mi hai preso!', 'Wow, che forza!', 'Dove andiamo?'];
+  const LAND_LINES = ['Ops!', 'Che volo!', 'Gira tutto!'];
+  const pickLine = a => a[Math.floor(Math.random() * a.length)];
+  const GRAV = 9.8, ROOM = 11;
+  const T = {
+    mode: 'home', // home | held | air | getup | wait | return
+    pos: new THREE.Vector3(), quat: new THREE.Quaternion(), vel: new THREE.Vector3(), spin: new THREE.Vector3(),
+    holder: null, rel: new THREE.Matrix4(), hist: [], t: 0, upFrom: new THREE.Quaternion(), upTo: new THREE.Quaternion(),
+    petCool: 0, stroke: 0, retFrom: null, retQ: null, retDur: 1,
+  };
+  const _m = new THREE.Matrix4(), _s = new THREE.Vector3(), ONE = new THREE.Vector3(1, 1, 1);
+  const readThrower = () => { thrower.updateMatrixWorld(true); thrower.matrixWorld.decompose(T.pos, T.quat, _s); };
+  const writeThrower = () => {
+    nav.updateMatrixWorld(true);
+    _m.compose(T.pos, T.quat, ONE).premultiply(new THREE.Matrix4().copy(nav.matrixWorld).invert());
+    _m.decompose(thrower.position, thrower.quaternion, _s);
+  };
+  const headPoint = (out = new THREE.Vector3()) => {
+    const box = new THREE.Box3().setFromObject(robot.head);
+    return box.getCenter(out);
+  };
+  function pet(c = null) {
+    if (T.petCool > 0) return;
+    T.petCool = 1.3;
+    robot.say(pickLine(PET_LINES), 2.5);
+    purr();
+    heartsAt(scene, headPoint().add(new THREE.Vector3(0, 0.15, 0)));
+    if (c) haptic(c, 0.25, 90);
+  }
+  function grab(holder) {
+    if (T.mode === 'held') return;
+    readThrower();
+    T.mode = 'held'; T.holder = holder; T.hist = [];
+    if (holder !== 'mouse') { holder.updateMatrixWorld(true); T.rel.copy(holder.matrixWorld).invert().multiply(thrower.matrixWorld); haptic(holder, 0.5, 60); }
+    pop(1.4);
+    if (Math.random() < 0.6) robot.say(pickLine(GRAB_LINES), 2.2);
+  }
+  function release() {
+    if (T.mode !== 'held') return;
+    const now = performance.now() / 1000;
+    const h = T.hist.filter(s => s.t >= now - 0.12);
+    T.vel.set(0, 0, 0);
+    if (h.length >= 2 && h[h.length - 1].t - h[0].t > 0.005) T.vel.subVectors(h[h.length - 1].p, h[0].p).divideScalar(h[h.length - 1].t - h[0].t);
+    T.vel.clampLength(0, 7);
+    const sp = T.vel.length();
+    T.spin.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize().multiplyScalar(Math.min(8, sp * 2));
+    T.mode = 'air'; T.holder = null; T.flew = sp > 1;
+    if (T.flew) whee();
+  }
+  function startReturn() {
+    T.mode = 'return'; T.t = 0;
+    T.retFrom = thrower.position.clone(); T.retQ = thrower.quaternion.clone();
+    T.retDur = Math.min(1.8, 0.8 + T.retFrom.length() * 0.25);
+    robot.say('Torno a casa!', 2);
+    whee();
+  }
+  function updateThrow(dt, now) {
+    T.petCool -= dt;
+    T.stroke *= 0.96;
+    if (T.mode === 'held') {
+      if (T.holder !== 'mouse') {
+        _m.multiplyMatrices(T.holder.matrixWorld, T.rel);
+        const p = new THREE.Vector3(), q = new THREE.Quaternion();
+        _m.decompose(p, q, _s);
+        T.pos.lerp(p, Math.min(1, dt * 16)); T.quat.slerp(q, Math.min(1, dt * 14));
+        writeThrower();
+        T.hist.push({ p: T.pos.clone(), t: now }); if (T.hist.length > 14) T.hist.shift();
+      }
+    } else if (T.mode === 'air') {
+      T.vel.y -= GRAV * dt;
+      T.pos.addScaledVector(T.vel, dt);
+      const s = T.spin.length();
+      if (s > 0.01) T.quat.premultiply(new THREE.Quaternion().setFromAxisAngle(T.spin.clone().divideScalar(s), s * dt));
+      const r = Math.hypot(T.pos.x, T.pos.z);
+      if (r > ROOM) { T.pos.x *= ROOM / r; T.pos.z *= ROOM / r; T.vel.x *= -0.5; T.vel.z *= -0.5; }
+      if (T.pos.y <= 0) {
+        T.pos.y = 0;
+        const impact = -T.vel.y;
+        if (impact > 1.5) { T.vel.y = impact * 0.3; T.vel.x *= 0.6; T.vel.z *= 0.6; T.spin.multiplyScalar(0.5); thud(impact / 6); }
+        else {
+          T.mode = 'getup'; T.t = 0; T.upFrom.copy(T.quat);
+          nav.updateMatrixWorld(true); nav.getWorldQuaternion(T.upTo);
+          thud(impact / 6);
+          if (T.flew) robot.say(pickLine(LAND_LINES), 1.8);
+        }
+      }
+      writeThrower();
+    } else if (T.mode === 'getup') {
+      // si rialza...
+      T.t += dt / 0.7;
+      T.quat.slerpQuaternions(T.upFrom, T.upTo, ease(T.t));
+      writeThrower();
+      if (T.t >= 1) { T.mode = 'wait'; T.t = 0; }
+    } else if (T.mode === 'wait') {
+      // ...e dopo un attimo torna da solo alla sua pedana
+      T.t += dt;
+      if (T.t > 0.5) startReturn();
+    } else if (T.mode === 'return') {
+      T.t += dt / T.retDur;
+      const k = ease(T.t);
+      thrower.position.lerpVectors(T.retFrom, new THREE.Vector3(), k);
+      thrower.position.y += Math.sin(Math.min(1, T.t) * Math.PI) * Math.min(1.5, 0.4 + T.retFrom.length() * 0.3);
+      thrower.quaternion.slerpQuaternions(T.retQ, new THREE.Quaternion(), k);
+      if (T.t >= 1) { thrower.position.set(0, 0, 0); thrower.quaternion.identity(); T.mode = 'home'; }
+    }
+    if (look) look.update(now, T.mode === 'air' || T.mode === 'held' || T.mode === 'return' ? 1 : 0);
+  }
+
+  // ---------- mouse: clic = carezza, trascina = prendi e lancia ----------
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
-  let downAt = null;
-  renderer.domElement.addEventListener('pointerdown', e => (downAt = [e.clientX, e.clientY]));
-  renderer.domElement.addEventListener('pointerup', e => {
-    if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) return;
+  let mouse = null;
+  const setRay = e => {
     const rc = renderer.domElement.getBoundingClientRect();
     ndc.set((e.clientX - rc.left) / rc.width * 2 - 1, -(e.clientY - rc.top) / rc.height * 2 + 1);
     ray.setFromCamera(ndc, camera);
-    if (ray.intersectObject(robot.root, true).length) robot.do('ciao');
+  };
+  // in fase di "cattura": così, se tocco il robot, la telecamera non gira
+  renderer.domElement.addEventListener('pointerdown', e => {
+    setRay(e);
+    const h = ray.intersectObject(robot.root, true)[0];
+    if (!h || T.mode === 'return') return;
+    controls.enabled = false;
+    readThrower();
+    const n = camera.getWorldDirection(new THREE.Vector3()).negate();
+    mouse = { x: e.clientX, y: e.clientY, moved: false, plane: new THREE.Plane().setFromNormalAndCoplanarPoint(n, h.point), offset: T.pos.clone().sub(h.point) };
+  }, { capture: true });
+  renderer.domElement.addEventListener('pointermove', e => {
+    if (!mouse) return;
+    if (!mouse.moved && Math.hypot(e.clientX - mouse.x, e.clientY - mouse.y) > 6) { mouse.moved = true; grab('mouse'); }
+    if (!mouse.moved) return;
+    setRay(e);
+    const p = ray.ray.intersectPlane(mouse.plane, new THREE.Vector3());
+    if (!p) return;
+    T.pos.copy(p.add(mouse.offset)); T.pos.y = Math.max(0, T.pos.y);
+    writeThrower();
+    T.hist.push({ p: T.pos.clone(), t: performance.now() / 1000 }); if (T.hist.length > 14) T.hist.shift();
   });
+  const mouseUp = () => {
+    if (!mouse) return;
+    controls.enabled = true;
+    if (mouse.moved) release(); else pet();
+    mouse = null;
+  };
+  renderer.domElement.addEventListener('pointerup', mouseUp);
+  renderer.domElement.addEventListener('pointercancel', mouseUp);
 
-  /* ---------- pulsantiera 3D per il visore ---------- */
+  /* ---------- pannelli 3D per il visore ---------- */
   const vrButtons = [];
-  const panel = new THREE.Group(); panel.visible = false; scene.add(panel);
-  {
-    const list = [...robot.actions, ['__prog', '🧩 Il mio programma']];
+  const panels = [];
+  // list = [[id, testo], ...]; onPress(id) quando si preme
+  function makeVrPanel(list, titleText, x, rotY, onPress) {
+    const panel = new THREE.Group(); panel.visible = false; scene.add(panel); panels.push(panel);
     const n = list.length, rows = Math.ceil(n / 2), PH = 0.13 + rows * 0.105;
-    panel.position.set(-0.5, 1.0, -1.15); panel.rotation.set(-0.55, 0.45, 0, 'YXZ');
+    panel.position.set(x, 1.0, -1.15); panel.rotation.set(-0.55, rotY, 0, 'YXZ');
     panel.add(new THREE.Mesh(new THREE.PlaneGeometry(0.52, PH), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.88 })));
     const { g, tex } = canvasTex(512, 96);
-    g.fillStyle = css; g.font = `800 72px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(name, 256, 52);
+    g.fillStyle = css; g.font = `800 64px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(titleText, 256, 52);
     const title = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.075), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
     title.position.set(0, PH / 2 - 0.055, 0.002); panel.add(title);
     list.forEach(([id, label], i) => {
@@ -404,10 +595,21 @@ export function startLab(RobotClass, { name, color, program = [] }) {
       l.position.z = 0.002; btn.add(l);
       const last = i === n - 1 && n % 2;
       btn.position.set(last ? 0 : (i % 2 ? 0.122 : -0.122), PH / 2 - 0.15 - Math.floor(i / 2) * 0.105, 0.004);
-      btn.userData = { id, mat };
+      btn.userData = { id, mat, onPress };
       panel.add(btn); vrButtons.push(btn);
     });
   }
+  // a sinistra: le azioni del robot
+  makeVrPanel([...robot.actions, ['__prog', '🧩 Il mio programma']], name, -0.5, 0.45,
+    id => (id === '__prog' ? coding.run() : robot.do(id)));
+  // a destra: vestiti e colori
+  if (look) {
+    makeVrPanel([
+      ['hat', '🎩 Cappello'], ['glasses', '👓 Occhiali'], ['bowtie', '🎀 Papillon'], ['cape', '🦸 Mantello'],
+      ['body', '🎨 Colore corpo'], ['accent', '🎨 Colore dettagli'], ['reset', '↺ Com’era prima'],
+    ], 'Personalizza', 0.5, -0.45, id => { if (id === 'reset') look.reset(); else look.cycle(id); pop(1.2); });
+  }
+
   const hot = new THREE.Color(color);
   const factory = new XRControllerModelFactory();
   const tmpM = new THREE.Matrix4(), xrRay = new THREE.Raycaster();
@@ -418,25 +620,102 @@ export function startLab(RobotClass, { name, color, program = [] }) {
     return xrRay;
   };
   const pick = c => { const h = rayFrom(c).intersectObjects(vrButtons, false); return h.length ? h[0] : null; };
+  function haptic(c, strength, ms) {
+    try { const a = c.userData.source && c.userData.source.gamepad && c.userData.source.gamepad.hapticActuators; if (a && a[0]) a[0].pulse(strength, ms); } catch { /* niente */ }
+  }
   const controllers = [0, 1].map(i => {
     const c = renderer.xr.getController(i); scene.add(c);
     const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -1)]),
       new THREE.LineBasicMaterial({ color: 0xffffff }));
     line.scale.z = 3; c.add(line); c.userData.line = line;
+    c.addEventListener('connected', e => (c.userData.source = e.data));
+    c.addEventListener('disconnected', () => (c.userData.source = null));
     c.addEventListener('selectstart', () => {
       const h = pick(c);
       if (h) {
-        const b = h.object, id = b.userData.id;
-        if (id === '__prog') coding.run(); else robot.do(id);
+        const b = h.object;
+        b.userData.onPress(b.userData.id);
         b.scale.setScalar(0.92); setTimeout(() => b.scale.setScalar(1), 150);
-      }
-      else if (rayFrom(c).intersectObject(robot.root, true).length) robot.do('ciao');
+      } else if (rayFrom(c).intersectObject(robot.root, true).length && T.mode !== 'return') grab(c); // punta e prendi
     });
+    c.addEventListener('selectend', () => { if (T.holder === c) release(); });
+    // tasto laterale (grip) con la mano vicino al robot = prendi
+    c.addEventListener('squeezestart', () => {
+      if (T.mode === 'return') return;
+      const box = new THREE.Box3().setFromObject(robot.root).expandByScalar(0.12);
+      if (box.containsPoint(new THREE.Vector3().setFromMatrixPosition(c.matrixWorld))) grab(c);
+    });
+    c.addEventListener('squeezeend', () => { if (T.holder === c) release(); });
     const grip = renderer.xr.getControllerGrip(i); grip.add(factory.createControllerModel(grip)); scene.add(grip);
     return c;
   });
-  renderer.xr.addEventListener('sessionstart', () => { document.body.classList.add('xr'); panel.visible = true; });
-  renderer.xr.addEventListener('sessionend', () => { document.body.classList.remove('xr'); panel.visible = false; setView(viewIdx); });
+  // carezze nel visore: controller vicino alla testa che si muove
+  const prevCtrl = new Map();
+  let headBox = new THREE.Box3(), headBoxT = 0;
+  function updateVrPet(dt) {
+    headBoxT -= dt;
+    if (headBoxT <= 0) { headBox = new THREE.Box3().setFromObject(robot.head).expandByScalar(0.1); headBoxT = 0.2; }
+    for (const c of controllers) {
+      const p = new THREE.Vector3().setFromMatrixPosition(c.matrixWorld);
+      const prev = prevCtrl.get(c); prevCtrl.set(c, p);
+      if (!prev || T.holder === c || T.mode !== 'home') continue;
+      if (headBox.containsPoint(p)) { T.stroke += p.distanceTo(prev); if (T.stroke > 0.15) { T.stroke = 0; pet(c); } }
+    }
+  }
+  renderer.xr.addEventListener('sessionstart', () => { document.body.classList.add('xr'); panels.forEach(p => (p.visible = true)); });
+  renderer.xr.addEventListener('sessionend', () => { document.body.classList.remove('xr'); panels.forEach(p => (p.visible = false)); setView(viewIdx); });
+
+  /* ---------- pannello "Personalizza" (PC) ---------- */
+  if (look) {
+    document.body.insertAdjacentHTML('beforeend', `
+      <div id="look">
+        <div class="lookHead">🎨 Personalizza ${name}<button id="lookClose" title="Chiudi">✕</button></div>
+        <div class="sec">🎩 Cappello</div><div class="chips" data-k="hat"></div>
+        <div class="sec">👓 Occhiali</div><div class="chips" data-k="glasses"></div>
+        <div class="sec">🎀 Papillon</div><div class="chips" data-k="bowtie"></div>
+        <div class="sec">🦸 Mantello</div><div class="chips" data-k="cape"></div>
+        <div class="sec">🎨 Colore del corpo</div><div class="swatches" data-k="body"></div>
+        <div class="sec">🎨 Colore dei dettagli</div><div class="swatches" data-k="accent"></div>
+        <button id="lookReset">↺ Com'era all'inizio</button>
+      </div>`);
+    const lookEl = document.getElementById('look');
+    const OPTIONS = {
+      hat: HATS.map(v => [v, HAT_NAMES[v]]),
+      glasses: [[false, 'No'], [true, 'Sì']],
+      bowtie: [[false, 'No'], [true, 'Sì']],
+      cape: CAPES.map(v => [v, CAPE_NAMES[v]]),
+    };
+    const render = () => {
+      lookEl.querySelectorAll('.chips').forEach(box => {
+        const k = box.dataset.k;
+        box.innerHTML = '';
+        OPTIONS[k].forEach(([v, label]) => {
+          const b = document.createElement('button'); b.textContent = label;
+          if (look.state[k] === v) b.classList.add('on');
+          b.onclick = () => { look.set(k, v); pop(1.2); render(); };
+          box.appendChild(b);
+        });
+      });
+      lookEl.querySelectorAll('.swatches').forEach(box => {
+        const k = box.dataset.k, list = k === 'body' ? BODY_COLORS : ACCENT_COLORS;
+        box.innerHTML = '';
+        list.forEach((c, i) => {
+          const b = document.createElement('button');
+          b.style.background = c || look.origColor[k];
+          b.title = i === 0 ? 'Colore originale' : c;
+          if (i === 0) b.textContent = '↺';
+          if (look.state[k] === i) b.classList.add('on');
+          b.onclick = () => { look.set(k, i); pop(1.2); render(); };
+          box.appendChild(b);
+        });
+      });
+    };
+    document.getElementById('bLook').onclick = () => { lookEl.classList.toggle('open'); render(); };
+    document.getElementById('lookClose').onclick = () => lookEl.classList.remove('open');
+    document.getElementById('lookReset').onclick = () => { look.reset(); render(); };
+  } else {
+    document.getElementById('bLook').style.display = 'none';
+  }
 
   /* ---------- ciclo ---------- */
   const clock = new THREE.Clock();
@@ -452,7 +731,10 @@ export function startLab(RobotClass, { name, color, program = [] }) {
       if (tween.t >= tween.dur) { robot.walking = robot.turning = false; const r = tween.res; tween = null; r(); }
     }
     robot.update(dt, now);
+    updateThrow(dt, now);
+    updateHearts(dt);
     if (renderer.xr.isPresenting) {
+      updateVrPet(dt);
       vrButtons.forEach(b => b.userData.mat.color.setHex(0xeef2f8));
       controllers.forEach(c => {
         const h = pick(c);

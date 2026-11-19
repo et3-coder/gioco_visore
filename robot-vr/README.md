@@ -57,6 +57,15 @@ e si comportano come oggetti veri.
 barzellette). Ogni robot ha i suoi pulsanti azione e la **programmazione a blocchi** in stile Scratch (Blockly,
 caricato da internet). È una pagina separata: dal visore la sessione VR si chiude e nel laboratorio si rientra
 con il suo pulsante VR; il pulsante "← Torna ai tre amici robot" riporta al gioco.
+Nel laboratorio si può anche:
+- **toccare** il robot (clic, oppure controller vicino alla testa che si muove): cuoricini, fusa e una frase;
+- **prenderlo e lanciarlo** (trascinandolo con il mouse, oppure con il grip o puntandolo con il grilletto):
+  vola, ruota, rimbalza, si rialza e **torna sempre da solo alla sua pedana**;
+- **vestirlo e cambiargli i colori** con il pannello *🎨 Personalizza* (nel visore: il pannello 3D a destra):
+  cappello (cilindro, corona, cappellino, fiocco), occhiali, papillon, mantello (rosso, blu, viola, oro),
+  colore del corpo e colore dei dettagli. Le scelte restano salvate per ogni robot.
+  Codice: `lab/look.js` (vestiti e colori) e `lab/common.js` (tocco e lancio); i punti di aggancio dei vestiti
+  sono in fondo a `lab/binot.html` e `lab/galaxine.html` (`look: {...}`).
 
 **AIBI** è l'aiutante: legge le istruzioni ad alta voce (pulsante con l'altoparlante per riascoltarle)
 e dopo 2 tentativi sbagliati dà un suggerimento. Dal livello 10 c'è anche la sfida del "programma più corto".

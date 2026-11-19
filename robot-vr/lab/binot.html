@@ -338,6 +338,14 @@ class Binot {
 
 startLab(Binot, {
   name: 'Binot', color: 0xff7a3d,
+  // dove si agganciano i vestiti (nella testa o nel corpo di Binot) e quali colori si possono cambiare
+  look: {
+    hat: { parent: 'head', pos: [0, 0.375, 0], scale: 5.5 },
+    glasses: { parent: 'head', pos: [0, 0.21, 0.192], scale: 5.8 },
+    neck: { parent: 'body', pos: [0, 0.985, 0.112], scale: 5 },
+    cape: { parent: 'body', pos: [0, 1.0, -0.11], w: 0.36, h: 0.6 },
+    colors: { body: [0xc9d1dc], accent: [0xff7a3d] },
+  },
   // programma di esempio che si vede aprendo i blocchi
   program: ['ciao', ['avanti', 2], ['gira', 'dx'], ['gira', 'dx'], ['dici', 'Ora volo!'], 'vola', ['casa'], 'danza'],
 });

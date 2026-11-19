@@ -359,6 +359,14 @@ class Galaxine {
 
 startLab(Galaxine, {
   name: 'Galaxine', color: 0x3d6dff,
+  // dove si agganciano i vestiti (nella testa o nel corpo di Galaxine) e quali colori si possono cambiare
+  look: {
+    hat: { parent: 'head', pos: [0, 0.135, 0], scale: 4.4 },
+    glasses: { parent: 'head', pos: [0, 0.02, 0.17], scale: 4.2 },
+    neck: { parent: 'torso', pos: [0, 0.6, 0.14], scale: 4.5 },
+    cape: { parent: 'torso', pos: [0, 0.58, -0.16], w: 0.42, h: 0.5 },
+    colors: { body: [0xf5f7ff], accent: [0x3d6dff] },
+  },
   // programma di esempio che si vede aprendo i blocchi
   program: ['ciao', ['avanti', 2], ['gira', 'sx'], ['avanti', 1], 'atterra', 'barzelletta', 'decolla', ['casa']],
 });
