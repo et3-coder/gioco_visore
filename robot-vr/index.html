@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>L'avventura dei tre amici</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #bfe3ff; font-family: system-ui, "Segoe UI", Roboto, Arial, sans-serif; }
+    canvas { display: block; touch-action: none; }
+    #help {
+      position: fixed; left: 12px; top: 12px; max-width: 340px;
+      background: rgba(255,255,255,.88); color: #253046; border-radius: 12px;
+      padding: 10px 14px; font-size: 14px; line-height: 1.4; box-shadow: 0 2px 10px rgba(0,0,0,.12);
+    }
+    #help b { color: #5a3fd6; }
+    #help button { margin-top: 6px; border: 0; background: #e8e3ff; color: #3b2a99; border-radius: 8px; padding: 4px 10px; cursor: pointer; }
+    #helpBtn {
+      position: fixed; left: 12px; top: 12px; border: 0; border-radius: 999px; padding: 6px 14px; cursor: pointer;
+      background: rgba(255,255,255,.88); color: #5a3fd6; font: bold 14px system-ui, "Segoe UI", Roboto, Arial, sans-serif;
+      box-shadow: 0 2px 8px rgba(0,0,0,.12);
+    }
+    #help { top: 52px !important; }
+    #xrButtons { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 12px; }
+    #xrButtons button {
+      border: 0; border-radius: 16px; padding: 10px 22px; min-width: 170px; cursor: pointer;
+      font: bold 18px system-ui, "Segoe UI", Roboto, Arial, sans-serif; color: #fff;
+      box-shadow: 0 3px 0 rgba(0,0,0,.2);
+    }
+    #xrButtons button small { display: block; font-weight: 500; font-size: 12px; opacity: .9; }
+    #btnVR { background: #5a3fd6; }
+    #btnAR { background: #ff3fa4; }
+    #xrButtons button:disabled { background: #b9bfcc; cursor: not-allowed; }
+    @media (max-width: 700px), (max-height: 500px) {
+      #help { font-size: 12px; max-width: 260px; padding: 8px 10px; }
+      #xrButtons button { min-width: 130px; font-size: 15px; padding: 8px 14px; }
+    }
+    #loading { position: fixed; inset: 0; display: grid; place-items: center; font-size: 22px; color: #253046; }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="loading">Caricamento…</div>
+  <button id="helpBtn">? Come si gioca</button>
+  <div id="help" style="display:none">
+    <b>L'avventura dei tre amici</b><br>
+    Sul visore scegli in basso:<br>
+    • <b>Entra in VR</b>: una stanza colorata tutta virtuale;<br>
+    • <b>Realtà mista</b>: vedi la tua stanza vera. Punta un tavolo e premi il <b>grilletto</b> per metterci sopra i robot.<br>
+    Poi punta i pulsanti con il controller e premi il grilletto. Sul PC clicca con il mouse.
+    <br><button id="hideHelp">Nascondi</button>
+  </div>
+  <div id="xrButtons">
+    <button id="btnVR" disabled>Entra in VR<small>stanza virtuale</small></button>
+    <button id="btnAR" disabled>Realtà mista<small>la tua stanza vera</small></button>
+  </div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
