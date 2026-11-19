@@ -280,7 +280,7 @@ const game = {
 
   leaveCurrent() {
     if (this.current) this.current.token++;
-    const wasStage = this.current && this.current.isStage;
+    const wasStage = this.current && this.current.movesAibi;
     this.current = null;
     clearTweens();
     music.stop(0.3); // la musica dei balletti si ferma quando si cambia schermata
@@ -357,7 +357,7 @@ const game = {
     screen.add(makeButton(0.5, 0.14, 'Gioca ancora', () => this.goMenu(), { color: '#2fbf71', icon: icons.play, size: 52 }), -0.3, LAYOUT.buttons);
     screen.add(makeButton(0.38, 0.14, 'Menu', () => this.goMenu(), { color: '#8a7fb0', icon: icons.home, size: 52 }), 0.2, LAYOUT.buttons);
     sfx.win();
-    this.say('Evviva! Hai superato tutti i livelli e aiutato EMO a ritrovare tutte le sue note. Facciamo festa tutti insieme!');
+    this.say('Evviva! Hai superato tutti i livelli e aiutato EMO, Loona e me a ritrovare tutti i nostri tesori. Facciamo festa tutti insieme!');
     // musica più bassa mentre AIBI parla, poi a tutto volume
     setTimeout(() => music.duck(true), 450);
     setTimeout(() => music.duck(false), 7000);

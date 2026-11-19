@@ -55,7 +55,7 @@ function makeNote() {
 
 function makeBone() {
   const g = new THREE.Group();
-  const mat = m(0xfff3dc);
+  const mat = m(0xd99a4e, { emissive: 0x3a2000, emissiveIntensity: 0.4 }); // marroncino: si vede bene sulle caselle bianche
   const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.07, 10), mat);
   shaft.rotation.z = Math.PI / 2;
   g.add(shaft);

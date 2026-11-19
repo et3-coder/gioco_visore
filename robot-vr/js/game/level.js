@@ -1,5 +1,6 @@
-// Un livello del gioco: il bambino mette in fila le carte comando per portare EMO fino alla nota.
-import { LEVELS, INTRO, DIRS, DIR_VEC } from '../levels.js';
+// Un livello del gioco: il bambino mette in fila le carte comando per portare il robot del livello
+// (EMO, Loona o AIBI, a turno) fino al suo tesoro (nota, osso o stella).
+import { LEVELS, INTRO, ROBOTS, DIRS, DIR_VEC } from '../levels.js';
 import { ProgramTrack, buildPalette } from '../ui/cards.js';
 import { makeButton } from '../ui/ui.js';
 import { icons } from '../ui/icons.js';
@@ -9,14 +10,16 @@ import { sfx } from '../audio.js';
 import { phrases } from '../hints.js';
 import { LAYOUT } from '../ui/layout.js';
 
-const GOAL_NAME = 'la nota';
-
 export class Level {
   constructor(game, index) {
     this.game = game;
     this.index = index;
     this.level = LEVELS[index];
-    this.robot = game.robots.emo;
+    this.robotKey = this.level.robot || 'emo';
+    this.robot = game.robots[this.robotKey];
+    this.goalKind = ROBOTS[this.robotKey].goal;
+    this.goalName = ROBOTS[this.robotKey].goalName;
+    this.movesAibi = this.robotKey === 'aibi'; // AIBI scende dal piedistallo: all'uscita va rimesso a posto
     this.token = 0;
     this.running = false;
     this.dirty = false;
@@ -26,8 +29,8 @@ export class Level {
 
   start() {
     const { game, level } = this;
-    game.board.build(level, 'note');
-    game.showRobots(['emo']);
+    game.board.build(level, this.goalKind);
+    game.showRobots(this.robotKey === 'aibi' ? [] : [this.robotKey]);
     this.placeAtStart();
     this.buildUI();
     game.say(this.index === 0 ? `${INTRO} ${level.intro}` : level.intro);
@@ -46,7 +49,7 @@ export class Level {
     const { game, level } = this;
     const scr = game.screen;
     scr.clear();
-    game.buildHeader(`Livello ${this.index + 1} di ${LEVELS.length}`);
+    game.buildHeader(`Livello ${this.index + 1} di ${LEVELS.length}  ·  Gioca ${this.robot.name}`);
 
     this.track = new ProgramTrack(scr, { y: LAYOUT.track, max: level.max, onSlotClick: (i) => this.onSlotClick(i) });
     this.track.setCards(this.cards);
@@ -158,8 +161,8 @@ export class Level {
     const name = this.robot.name;
     let msg = reason === 'edge' ? phrases.edge(name)
       : reason === 'bump' ? phrases.bump(name)
-      : reason === 'passed' ? phrases.passed(name, GOAL_NAME)
-      : phrases.notThere(name, GOAL_NAME);
+      : reason === 'passed' ? phrases.passed(name, this.goalName)
+      : phrases.notThere(name, this.goalName);
     if (this.fails >= 2 && this.level.hint) msg += ' Suggerimento: ' + this.level.hint;
     this.robot.sad();
     this.game.say(msg);

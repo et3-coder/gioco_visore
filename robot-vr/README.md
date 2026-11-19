@@ -1,25 +1,30 @@
-# L'avventura di EMO
+# I tre amici robot
 
-Gioco educativo in realtà virtuale (WebXR) per bambini: si impara il **coding** guidando il robot **EMO**
-con le carte comando. Funziona nel browser del visore Meta Quest: non serve installare app.
+Gioco educativo in realtà virtuale (WebXR) per bambini: si impara il **coding** guidando i robot
+**EMO**, **Loona** e **AIBI** con le carte comando. Funziona nel browser del visore Meta Quest: non serve installare app.
 
 ## Com'è fatto il gioco
 
-EMO ha perso le sue note musicali: il bambino mette in fila le **carte comando** (avanti, gira a sinistra,
-gira a destra, ripeti, fine ripeti) e preme *Via!* per farlo arrivare alla nota.
+I tre robot hanno perso i loro tesori: EMO le **note**, Loona l'**osso**, AIBI le **stelle**. Il bambino mette in fila
+le **carte comando** (avanti, gira a sinistra, gira a destra, ripeti, fine ripeti) e preme *Via!* per guidare il robot
+fino al tesoro. I robot giocano **a turno**: livello 1 EMO, 2 Loona, 3 AIBI, 4 EMO e così via
+(nei suoi livelli AIBI scende dal piedistallo e gioca lui).
 
-Ci sono **12 livelli** a difficoltà crescente; superato un livello si sblocca il successivo
-(i progressi restano salvati nel browser del visore):
+Ci sono **18 livelli** a difficoltà crescente; superato un livello si sblocca il successivo
+(i progressi restano salvati nel browser del visore). **In ogni livello bisogna girare sia a destra sia a sinistra**:
+i blocchi impediscono di arrivare andando solo dritti.
 
 | Livelli | Griglia | Novità |
 |---|---|---|
-| 1-2 | 4×4 | solo la carta *Avanti* |
-| 3-5 | 5×5 | le svolte (*sinistra* / *destra*) e il primo ostacolo |
-| 6-7 | 6×6 | percorsi lunghi con più curve, un piccolo labirinto |
-| 8-12 | 6×6 → 8×8 | la carta *Ripeti* (cicli), *Fine ripeti*, scale e un ciclo dentro l'altro |
+| 1-3 | 5×5 | prime curve: una a destra e una a sinistra |
+| 4-6 | 6×6 | percorsi più lunghi, ostacoli da aggirare |
+| 7-9 | 7×7 | scale, labirinto a zig-zag, quattro curve |
+| 10-12 | 7×7 | la carta *Ripeti* (cicli) e *Fine ripeti* |
+| 13-18 | 8×8 | cicli su griglie grandi, scale al contrario, un *Ripeti* dentro l'altro |
 
 Dopo l'ultimo livello c'è la **festa finale**. Dal menu si può riprendere dall'ultimo livello sbloccato,
-rigiocare un livello già superato o ricominciare da capo.
+rigiocare un livello già superato (i numeri sono colorati per robot: viola EMO, arancione Loona, verde AIBI;
+dorati quelli superati) o ricominciare da capo.
 
 **Il palco** (pulsante nel menu) è una modalità creativa senza obiettivo: il bambino compone una coreografia
 con le carte azione (*balla*, *salta*, *giravolta*, *inchino*, *parla*, *musica*, *felici*, più *ripeti* e
@@ -29,7 +34,7 @@ generata dal browser (batteria, basso, accordi e melodia, in `js/audio.js` → `
 quando i robot parlano.
 
 **AIBI** è l'aiutante: legge le istruzioni ad alta voce (pulsante con l'altoparlante per riascoltarle)
-e dopo 2 tentativi sbagliati dà un suggerimento. Dal livello 8 c'è anche la sfida del "programma più corto".
+e dopo 2 tentativi sbagliati dà un suggerimento. Dal livello 10 c'è anche la sfida del "programma più corto".
 
 Per gli adulti: Meta consiglia i visori Quest dai 10 anni in su. Con i bambini più piccoli fate partite brevi
 (10-15 minuti) e restate sempre vicini.
@@ -107,7 +112,7 @@ index.html                 pagina principale
 serve.ps1                  server locale per le prove sul PC
 js/main.js                 scena 3D, stanza, ciclo di gioco, avvio VR / realtà mista, livelli e progressi
 js/xr/placement.js         realtà mista: mirino e posizionamento sul tavolo vero (hit-test)
-js/levels.js               i 12 livelli in ordine di difficoltà e i testi (qui si modificano o aggiungono)
+js/levels.js               i 18 livelli in ordine di difficoltà, con robot e soluzione e i testi (qui si modificano o aggiungono)
 js/robots/                 modelli 3D e animazioni di EMO, Loona, AIBI (+ faccia-schermo animata)
 js/robots/models.js        caricamento di eventuali modelli .glb completi e loro regolazioni
 models/                    qui vanno eventuali emo.glb, loona.glb, aibi.glb
@@ -124,10 +129,15 @@ js/audio.js                effetti sonori
 In `js/levels.js` ogni livello è un oggetto, per esempio:
 
 ```js
-{ size: [5, 5], start: { x: 0, z: 4, dir: 'N' }, goal: { x: 2, z: 2 },
+{ robot: 'loona', size: [5, 5], start: { x: 0, z: 4, dir: 'N' }, goal: { x: 2, z: 2 },
   walls: [[3, 4]], cards: ['F', 'L', 'R'], max: 8,
-  intro: 'Testo che AIBI legge all\'inizio', hint: 'Suggerimento dopo 2 errori' }
+  intro: 'Testo che AIBI legge all\'inizio', hint: 'Suggerimento dopo 2 errori',
+  solution: ['F', 'F', 'R', 'F', 'F', 'L'] }
 ```
+
+- `robot`: chi gioca (`'emo'`, `'loona'` o `'aibi'`): l'obiettivo diventa nota, osso o stella.
+- `solution`: una soluzione possibile, utile per controllare che il livello si possa risolvere
+  (ricordati che deve contenere sia `L` sia `R`).
 
 - `x` = colonna (0 a sinistra), `z` = riga (0 è la più lontana dal giocatore).
 - `dir`: `N` lontano, `S` verso il giocatore, `E` destra, `W` sinistra.

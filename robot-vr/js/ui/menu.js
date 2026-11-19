@@ -27,7 +27,7 @@ export function showMainMenu(game) {
   const scr = game.screen;
   scr.clear();
   welcomeBoard(game);
-  game.buildHeader("L'avventura di EMO: impara a programmare un robot");
+  game.buildHeader('I tre amici robot: impara a programmare con EMO, Loona e AIBI');
 
   const unlocked = game.unlocked; // numero di livelli sbloccati
   const next = Math.min(unlocked, LEVELS.length) - 1;
@@ -36,15 +36,20 @@ export function showMainMenu(game) {
   const stage = makeButton(0.72, 0.2, 'Il palco', () => game.startStage(), { color: '#ff4fa3', icon: icons.star, size: 72 });
   scr.add(stage, 0.42, LAYOUT.track + 0.01);
 
-  // Livelli: quelli sbloccati si possono rigiocare, gli altri sono grigi
+  // Livelli su due file: superati = dorati, da fare = colore del robot, bloccati = grigi
+  const ROBOT_COLOR = { emo: '#6a5cff', loona: '#ff8a3d', aibi: '#22b07d' };
   const n = LEVELS.length;
-  const size = 0.135, step = 0.155;
-  const x0 = -((n - 1) * step) / 2;
+  const perRow = Math.ceil(n / 2);
+  const size = 0.12, step = 0.142;
   for (let i = 0; i < n; i++) {
-    const open = i < unlocked;
-    const b = makeButton(size, size, String(i + 1), () => game.startLevel(i), { color: i < unlocked - 1 ? '#ffb020' : '#4d8dff', size: 64 });
-    b.userData.setEnabled(open);
-    scr.add(b, x0 + i * step, LAYOUT.palette);
+    const row = Math.floor(i / perRow), col = i % perRow;
+    const inRow = row === 0 ? perRow : n - perRow;
+    const x = (col - (inRow - 1) / 2) * step;
+    const y = LAYOUT.palette + 0.07 - row * 0.15;
+    const done = i < unlocked - 1;
+    const b = makeButton(size, size, String(i + 1), () => game.startLevel(i), { color: done ? '#ffb020' : ROBOT_COLOR[LEVELS[i].robot], size: 60 });
+    b.userData.setEnabled(i < unlocked);
+    scr.add(b, x, y);
   }
 
   scr.add(voiceButton(), -0.5, LAYOUT.buttons);
@@ -57,5 +62,5 @@ export function showMainMenu(game) {
 
   game.say(unlocked > 1
     ? `Eccoti di nuovo! Premi Gioca per continuare dal livello ${next + 1}, oppure scegli un livello qui sotto.`
-    : 'Ciao! Io sono AIBI. Aiutiamo EMO a ritrovare le sue note? Ogni livello è un po\' più difficile del precedente. Premi Gioca! Oppure sali sul palco e inventa uno spettacolo.');
+    : 'Ciao! Io sono AIBI. In ogni livello guiderai uno di noi tre: EMO, Loona o me! Ogni livello è un po\' più difficile. Premi Gioca, oppure sali sul palco e inventa uno spettacolo.');
 }

@@ -24,7 +24,7 @@ const LINES = [
 export class Stage {
   constructor(game) {
     this.game = game;
-    this.isStage = true;
+    this.movesAibi = true; // AIBI scende dal piedistallo: all'uscita va rimesso a posto
     this.token = 0;
     this.running = false;
     this.cards = [];
