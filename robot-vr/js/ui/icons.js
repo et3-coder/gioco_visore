@@ -101,6 +101,14 @@ export const icons = {
       ctx.stroke();
     }
   },
+  heart(ctx, cx, cy, s) {
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + s * 0.85);
+    ctx.bezierCurveTo(cx - s * 1.3, cy + s * 0.05, cx - s * 0.65, cy - s * 1.05, cx, cy - s * 0.35);
+    ctx.bezierCurveTo(cx + s * 0.65, cy - s * 1.05, cx + s * 1.3, cy + s * 0.05, cx, cy + s * 0.85);
+    ctx.fill();
+  },
   star(ctx, cx, cy, s) {
     ctx.fillStyle = '#fff';
     ctx.beginPath();

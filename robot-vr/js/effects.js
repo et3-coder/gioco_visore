@@ -42,3 +42,50 @@ export function updateEffects(dt) {
     }
   }
 }
+
+// ---------------- Cuoricini (quando si accarezza un robot) ----------------
+let heartTex = null;
+function getHeartTex() {
+  if (heartTex) return heartTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#ff4f8b';
+  ctx.beginPath();
+  ctx.moveTo(32, 56);
+  ctx.bezierCurveTo(-8, 30, 12, 0, 32, 18);
+  ctx.bezierCurveTo(52, 0, 72, 30, 32, 56);
+  ctx.fill();
+  heartTex = new THREE.CanvasTexture(c);
+  heartTex.colorSpace = THREE.SRGBColorSpace;
+  return heartTex;
+}
+const hearts = [];
+
+export function heartsAt(parent, position, count = 5) {
+  for (let i = 0; i < count; i++) {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: getHeartTex(), transparent: true, depthWrite: false }));
+    s.scale.setScalar(0.03 + Math.random() * 0.02);
+    s.position.copy(position).add(new THREE.Vector3((Math.random() - 0.5) * 0.08, Math.random() * 0.03, (Math.random() - 0.5) * 0.08));
+    s.userData.v = new THREE.Vector3((Math.random() - 0.5) * 0.08, 0.18 + Math.random() * 0.12, (Math.random() - 0.5) * 0.08);
+    s.userData.life = 1.2 + Math.random() * 0.4;
+    s.userData.max = s.userData.life;
+    s.userData.parent = parent;
+    parent.add(s);
+    hearts.push(s);
+  }
+}
+
+export function updateHearts(dt) {
+  for (let i = hearts.length - 1; i >= 0; i--) {
+    const s = hearts[i];
+    s.userData.life -= dt;
+    s.position.addScaledVector(s.userData.v, dt);
+    s.material.opacity = Math.max(0, s.userData.life / s.userData.max);
+    if (s.userData.life <= 0) {
+      s.userData.parent.remove(s);
+      s.material.dispose();
+      hearts.splice(i, 1);
+    }
+  }
+}

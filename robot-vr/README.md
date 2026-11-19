@@ -22,7 +22,9 @@ i blocchi impediscono di arrivare andando solo dritti.
 | 10-12 | 7×7 | la carta *Ripeti* (cicli) e *Fine ripeti* |
 | 13-18 | 8×8 | cicli su griglie grandi, scale al contrario, un *Ripeti* dentro l'altro |
 
-Dopo l'ultimo livello c'è la **festa finale**. Dal menu si può riprendere dall'ultimo livello sbloccato,
+Tra un livello e l'altro c'è una **scala magica**: premendo *Avanti* il robot sale una scala di gradini colorati
+e sparisce; nel livello successivo il nuovo robot scende da un'altra scala fino alla casella di partenza
+(nel frattempo le carte sono bloccate). Dopo l'ultimo livello c'è la **festa finale**. Dal menu si può riprendere dall'ultimo livello sbloccato,
 rigiocare un livello già superato (i numeri sono colorati per robot: viola EMO, arancione Loona, verde AIBI;
 dorati quelli superati) o ricominciare da capo.
 
@@ -32,6 +34,17 @@ con le carte azione (*balla*, *salta*, *giravolta*, *inchino*, *parla*, *musica*
 (codice in `js/game/stage.js`). Durante lo spettacolo e la festa finale suona una base musicale allegra
 generata dal browser (batteria, basso, accordi e melodia, in `js/audio.js` → `music`), che si abbassa
 quando i robot parlano.
+
+**Coccole e lanci** (terzo pulsante del menu, codice in `js/game/play.js`): i tre robot sono liberi sul tavolo
+e si comportano come oggetti veri.
+- Visore: avvicina il controller (o la mano) alla testa di un robot e muovilo per **accarezzarlo**
+  (occhi a cuore, cuoricini, fusa, una frase con la sua voce); tieni premuto il **tasto laterale (grip)** vicino
+  al robot, oppure **puntalo e premi il grilletto**, per prenderlo; lascia il tasto mentre muovi la mano per
+  **lanciarlo**: vola, ruota, rimbalza su tavolo e pavimento e poi si rialza da solo.
+- PC: clic su un robot = carezza; trascinalo con il mouse e lascialo andare = lancio.
+- Se un robot finisce fuori dal tavolo (per terra, lontano, sotto il tavolo), dopo essersi rialzato torna
+  da solo al suo posto dicendo "Torno da te!".
+- *Chiama i robot* li riporta sul tavolo; *Tutti a ballare* li fa ballare con la musica.
 
 **AIBI** è l'aiutante: legge le istruzioni ad alta voce (pulsante con l'altoparlante per riascoltarle)
 e dopo 2 tentativi sbagliati dà un suggerimento. Dal livello 10 c'è anche la sfida del "programma più corto".

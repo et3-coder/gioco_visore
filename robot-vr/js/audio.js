@@ -54,6 +54,38 @@ export const sfx = {
     for (let t = 0, i = 0; t < seconds; t += 0.3, i++) tone(i % 2 ? 220 : 147, 0.1, { type: 'square', vol: 0.05, when: t });
   },
   boing() { tone(220, 0.35, { type: 'sine', vol: 0.15, slideTo: 660 }); },
+  // fusa quando si accarezza un robot: suono basso che "vibra"
+  purr() {
+    const c = ac();
+    if (!c) return;
+    const t = c.currentTime;
+    const o = c.createOscillator();
+    const lfo = c.createOscillator();
+    const lfoGain = c.createGain();
+    const g = c.createGain();
+    o.type = 'triangle';
+    o.frequency.value = 95;
+    lfo.frequency.value = 22;
+    lfoGain.gain.value = 0.06;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.08, t + 0.1);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+    lfo.connect(lfoGain).connect(g.gain);
+    o.connect(g).connect(c.destination);
+    o.start(t); lfo.start(t);
+    o.stop(t + 1); lfo.stop(t + 1);
+    tone(880, 0.12, { type: 'sine', vol: 0.06, when: 0.05 });
+    tone(1175, 0.15, { type: 'sine', vol: 0.06, when: 0.15 });
+  },
+  // nota della scala magica: sale di tono a ogni gradino (scala di Do maggiore)
+  stepNote(i, down = false) {
+    const scale = [523, 587, 659, 698, 784, 880, 988, 1047];
+    const f = scale[Math.max(0, Math.min(scale.length - 1, down ? scale.length - 1 - i : i))];
+    tone(f, 0.16, { type: 'triangle', vol: 0.14 });
+  },
+  whee() { tone(420, 0.45, { type: 'sine', vol: 0.12, slideTo: 1300 }); },
+  thud(strength = 1) { tone(110, 0.18, { type: 'sine', vol: 0.08 + 0.12 * Math.min(1, strength), slideTo: 55 }); },
+  grab() { tone(600, 0.08, { type: 'triangle', vol: 0.12 }); tone(900, 0.1, { type: 'triangle', vol: 0.1, when: 0.06 }); },
   whoosh() { tone(300, 0.6, { type: 'sawtooth', vol: 0.05, slideTo: 900 }); },
   applause() {
     const c = ac();

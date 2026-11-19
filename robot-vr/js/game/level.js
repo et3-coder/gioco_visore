@@ -5,7 +5,13 @@ import { ProgramTrack, buildPalette } from '../ui/cards.js';
 import { makeButton } from '../ui/ui.js';
 import { icons } from '../ui/icons.js';
 import { compile } from './program.js';
-import { wait, clearTweens } from '../util/tween.js';
+import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { wait, clearTweens, animate, ease } from '../util/tween.js';
+
+const STEPS = 5; // gradini della scala magica
+const RISE = 0.045; // altezza di ogni gradino (metri)
+const STEP_COLORS = [0xff5d8f, 0xffb020, 0x2fbf71, 0x4d8dff, 0x9b5cff];
 import { sfx } from '../audio.js';
 import { phrases } from '../hints.js';
 import { LAYOUT } from '../ui/layout.js';
@@ -34,6 +40,103 @@ export class Level {
     this.placeAtStart();
     this.buildUI();
     game.say(this.index === 0 ? `${INTRO} ${level.intro}` : level.intro);
+    // il robot arriva scendendo da una scala magica; nel frattempo le carte sono bloccate
+    this.busy = true;
+    this.enterStairs().finally(() => { this.busy = false; });
+  }
+
+  // ---------- Scala magica tra un livello e l'altro ----------
+  // Costruisce STEPS gradini colorati che partono da "origin" nella direzione "dirVec" e salgono.
+  async buildStairs(origin, dirVec, token) {
+    const board = this.game.board;
+    const cell = board.cell;
+    const group = new THREE.Group();
+    board.content.add(group);
+    const tops = [];
+    const steps = [];
+    for (let i = 0; i < STEPS; i++) {
+      const color = STEP_COLORS[i % STEP_COLORS.length];
+      const step = new THREE.Mesh(
+        new RoundedBoxGeometry(cell * 0.62, 0.02, cell * 0.62, 2, 0.007),
+        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.3, roughness: 0.4 })
+      );
+      const top = origin.clone().addScaledVector(dirVec, cell * 0.42 * (i + 1));
+      top.y = origin.y + RISE * (i + 1);
+      step.position.copy(top).setY(top.y - 0.01);
+      step.scale.setScalar(0.001);
+      group.add(step);
+      steps.push(step);
+      tops.push(top);
+    }
+    // i gradini compaiono uno alla volta, con una nota che sale
+    for (let i = 0; i < STEPS; i++) {
+      if (token !== this.token) return null;
+      sfx.stepNote(i);
+      await animate(0.12, (t) => steps[i].scale.setScalar(Math.max(0.001, t)), ease.backOut);
+    }
+    return { group, steps, tops };
+  }
+
+  async removeStairs(stairs) {
+    if (!stairs) return;
+    await animate(0.3, (t) => stairs.steps.forEach((s) => s.scale.setScalar(Math.max(0.001, 1 - t))));
+    if (stairs.group.parent) stairs.group.parent.remove(stairs.group);
+  }
+
+  // Entrata: il robot compare in cima alla scala e scende fino alla casella di partenza
+  async enterStairs() {
+    const token = this.token;
+    const r = this.robot;
+    const { start } = this.level;
+    const startPos = this.game.board.cellPos(start.x, start.z);
+    const back = this.game.dirVector((DIRS[start.dir] + 2) % 4); // la scala arriva da dietro il robot
+    const size = r.group.scale.x;
+    r.group.scale.setScalar(0.0001);
+    const stairs = await this.buildStairs(startPos, back, token);
+    if (!stairs || token !== this.token) return;
+    r.group.position.copy(stairs.tops[STEPS - 1]);
+    r.setDir(DIRS[start.dir]);
+    sfx.boing();
+    r.face.set('happy', 2.5);
+    await animate(0.35, (t) => r.group.scale.setScalar(Math.max(0.0001, size * t)), ease.backOut);
+    for (let i = STEPS - 2; i >= -1; i--) {
+      if (token !== this.token) return;
+      await r.moveTo(i >= 0 ? stairs.tops[i] : startPos, 0.24, 0.03);
+      sfx.stepNote(i + 1, true);
+    }
+    r.group.scale.setScalar(size);
+    if (token !== this.token) return;
+    await this.removeStairs(stairs);
+  }
+
+  // Uscita: il robot sale una scala di lato e sparisce verso il livello successivo
+  async exitStairs() {
+    const token = this.token;
+    const r = this.robot;
+    const board = this.game.board;
+    r.body.position.set(0, 0, 0);
+    r.body.rotation.set(0, 0, 0);
+    r.moving = false;
+    const dir = this.level.goal.x >= (board.W - 1) / 2 ? DIRS.E : DIRS.W;
+    await r.turnToDir(dir, 0.3);
+    if (token !== this.token) return false;
+    const stairs = await this.buildStairs(r.group.position.clone(), this.game.dirVector(dir), token);
+    if (!stairs) return false;
+    r.face.set('happy', 4);
+    for (let i = 0; i < STEPS; i++) {
+      if (token !== this.token) return false;
+      await r.moveTo(stairs.tops[i], 0.24, 0.03);
+    }
+    // in cima: giravolta, coriandoli e... sparisce!
+    sfx.whee();
+    this.game.confettiAt(r.group);
+    const size = r.group.scale.x;
+    const rot0 = r.pivot.rotation.y;
+    await animate(0.5, (t) => {
+      r.group.scale.setScalar(Math.max(0.0001, size * (1 - t)));
+      r.pivot.rotation.y = rot0 + t * Math.PI * 3;
+    });
+    return token === this.token;
   }
 
   placeAtStart() {
@@ -67,7 +170,7 @@ export class Level {
 
   // ---------- Modifica del programma ----------
   onSlotClick(i) {
-    if (this.running) return;
+    if (this.running || this.busy) return;
     if (this.dirty) this.placeAtStart();
     this.cards.splice(i, 1); // toccare una carta del programma la toglie
     this.track.setCards(this.cards);
@@ -75,7 +178,7 @@ export class Level {
   }
 
   onPick(kind) {
-    if (this.running) return;
+    if (this.running || this.busy) return;
     if (this.dirty) this.placeAtStart();
     if (this.cards.length >= this.level.max) {
       this.game.say(phrases.tooMany());
@@ -87,7 +190,7 @@ export class Level {
   }
 
   clearAll() {
-    if (this.running) return;
+    if (this.running || this.busy) return;
     this.cards = [];
     this.track.setCards(this.cards);
     this.placeAtStart();
@@ -108,6 +211,7 @@ export class Level {
   }
 
   async run() {
+    if (this.busy) return; // il robot sta ancora scendendo dalla scala
     if (this.cards.length === 0) {
       this.game.say(phrases.empty());
       return;
@@ -192,10 +296,14 @@ export class Level {
     await this.robot.celebrate();
   }
 
-  next() {
-    this.token++;
+  async next() {
+    if (this.busy) return;
+    this.busy = true;
+    this.nextBtn.visible = false;
+    this.token++; // ferma i festeggiamenti in corso
     clearTweens();
-    this.game.nextLevel(this.index);
+    const ok = await this.exitStairs(); // il robot sale la scala magica e sparisce
+    if (ok) this.game.nextLevel(this.index);
   }
 
   exit() {

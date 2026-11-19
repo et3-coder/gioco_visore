@@ -18,7 +18,8 @@ import { showMainMenu } from './ui/menu.js';
 import { Level } from './game/level.js';
 import { Stage } from './game/stage.js';
 import { speak } from './hints.js';
-import { confetti, updateEffects } from './effects.js';
+import { confetti, updateEffects, updateHearts } from './effects.js';
+import { Play } from './game/play.js';
 import { sfx, music } from './audio.js';
 
 const DESIGN_EYE = 1.25; // altezza degli occhi per cui è pensata la scena (bambino in piedi)
@@ -204,6 +205,9 @@ const game = {
   mode: 'desktop', // 'desktop' | 'vr' | 'ar'
   view: 'main', // schermata attuale: 'main' | 'level' | 'finale'
   screen,
+  pointers,
+  camera,
+  renderer,
   board,
   robots,
   world,
@@ -259,6 +263,7 @@ const game = {
     if (robot.group.parent !== board.group) board.group.add(robot.group);
     robot.group.position.copy(board.cellPos(x, z));
     robot.group.scale.setScalar(board.robotScale());
+    robot.group.quaternion.identity(); // dritto (potrebbe essere stato lanciato in "Coccole e lanci")
     robot.body.position.set(0, 0, 0);
     robot.body.rotation.set(0, 0, 0);
     robot.moving = false;
@@ -280,6 +285,7 @@ const game = {
 
   leaveCurrent() {
     if (this.current) this.current.token++;
+    if (this.current && this.current.dispose) this.current.dispose();
     const wasStage = this.current && this.current.movesAibi;
     this.current = null;
     clearTweens();
@@ -291,6 +297,7 @@ const game = {
       a.acting = false;
       a.body.position.set(0, 0, 0);
       a.body.rotation.set(0, 0, 0);
+      a.group.quaternion.identity();
       applyLayout(this.mode === 'ar' ? 'ar' : 'vr');
     }
     if (this.finaleOn) {
@@ -318,6 +325,22 @@ const game = {
     this.view = 'stage';
     this.current = new Stage(this);
     this.current.start();
+  },
+
+  // Coccole e lanci: i robot sono liberi, si accarezzano, si prendono e si lanciano
+  startPlay() {
+    this.leaveCurrent();
+    this.view = 'play';
+    this.current = new Play(this);
+    this.current.start();
+  },
+
+  // Posizione della testa del giocatore nelle coordinate della stanza di gioco
+  headLocal() {
+    const p = new THREE.Vector3();
+    if (renderer.xr.isPresenting) p.setFromMatrixPosition(renderer.xr.getCamera().matrixWorld);
+    else camera.getWorldPosition(p);
+    return world.worldToLocal(p);
   },
 
   nextLevel(index) {
@@ -490,6 +513,8 @@ renderer.setAnimationLoop((time, frame) => {
   for (const r of Object.values(robots)) r.update(dt, elapsed);
   board.update(dt, elapsed);
   updateEffects(dt);
+  updateHearts(dt);
+  if (game.current && game.current.update) game.current.update(dt, elapsed);
   for (const b of balloons.children) b.position.y = b.userData.baseY + Math.sin(elapsed * 0.8 + b.userData.phase) * 0.08;
   if (game.finaleOn) {
     game.finaleTimer -= dt;

@@ -165,20 +165,40 @@ export class Pointers {
     this.mouse = { raycaster: new THREE.Raycaster(), ndc: new THREE.Vector2(), active: false, hovered: null };
     this.controllers = [];
     this.onMissSelect = null;
+    // Ganci per le modalità che usano i robot come oggetti (Coccole e lanci):
+    // onXR(tipo, controller) per grilletto/grip; onMouseDown/Move/Up(raycaster, evento) per il mouse fuori dai pulsanti
+    this.onXR = null;
+    this.onMouseDown = null;
+    this.onMouseMove = null;
+    this.onMouseUp = null;
 
     const dom = renderer.domElement;
-    dom.addEventListener('pointermove', (e) => {
-      this.mouse.ndc.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
-      this.mouse.active = true;
-    });
-    dom.addEventListener('pointerdown', (e) => {
-      sfx.unlock();
+    const setNdc = (e) => {
       this.mouse.ndc.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
       this.mouse.active = true;
       this.mouse.raycaster.setFromCamera(this.mouse.ndc, this.camera);
+    };
+    dom.addEventListener('pointermove', (e) => {
+      setNdc(e);
+      if (this.onMouseMove) this.onMouseMove(this.mouse.raycaster, e);
+    });
+    dom.addEventListener('pointerdown', (e) => {
+      sfx.unlock();
+      setNdc(e);
       const hit = this.pick(this.mouse.raycaster);
       if (hit) hit.userData.onClick();
+      else if (this.onMouseDown) {
+        // "cattura" il puntatore: il rilascio arriva anche se il mouse esce dalla finestra
+        try { dom.setPointerCapture(e.pointerId); } catch (err) { /* non supportato */ }
+        this.onMouseDown(this.mouse.raycaster, e);
+      }
     });
+    const up = (e) => {
+      try { dom.releasePointerCapture(e.pointerId); } catch (err) { /* già rilasciato */ }
+      if (this.onMouseUp) this.onMouseUp(this.mouse.raycaster, e);
+    };
+    dom.addEventListener('pointerup', up);
+    dom.addEventListener('pointercancel', up);
 
     for (let i = 0; i < 2; i++) {
       const c = renderer.xr.getController(i);
@@ -199,21 +219,24 @@ export class Pointers {
         if (entry.hovered) {
           this.haptic(entry);
           entry.hovered.userData.onClick();
-        } else if (this.onMissSelect) {
-          // grilletto premuto senza puntare un pulsante (usato per posizionare il gioco in realtà mista)
-          this.haptic(entry);
-          this.onMissSelect(entry);
+        } else {
+          // grilletto premuto senza puntare un pulsante (posizionare il gioco in realtà mista, prendere un robot...)
+          if (this.onMissSelect) this.onMissSelect(entry);
+          if (this.onXR) this.onXR('selectstart', entry);
         }
       });
+      for (const type of ['selectend', 'squeezestart', 'squeezeend']) {
+        c.addEventListener(type, () => { if (this.onXR) this.onXR(type, entry); });
+      }
       scene.add(c);
       this.controllers.push(entry);
     }
   }
 
-  haptic(entry) {
+  haptic(entry, strength = 0.4, ms = 40) {
     try {
       const h = entry.source && entry.source.gamepad && entry.source.gamepad.hapticActuators;
-      if (h && h[0]) h[0].pulse(0.4, 40);
+      if (h && h[0]) h[0].pulse(strength, ms);
     } catch (e) { /* niente vibrazione */ }
   }
 

@@ -21,15 +21,16 @@ function clean(text) {
     .trim();
 }
 
-export function speak(text) {
+// pitch/rate permettono voci diverse per ogni robot (EMO più acuto, Loona ancora di più...)
+export function speak(text, { pitch = 1.25, rate = 0.95 } = {}) {
   if (!enabled || !('speechSynthesis' in window)) return;
   try {
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(clean(text));
     u.lang = 'it-IT';
     if (voice) u.voice = voice;
-    u.rate = 0.95;
-    u.pitch = 1.25;
+    u.rate = rate;
+    u.pitch = pitch;
     speechSynthesis.speak(u);
   } catch (e) {
     /* la voce non è disponibile: si legge solo il testo */
