@@ -8,6 +8,7 @@ export { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 export { THREE };
 import { setupCoding } from './coding.js';
 import { setupLook, HATS, HAT_NAMES, CAPES, CAPE_NAMES, BODY_COLORS, ACCENT_COLORS } from './look.js';
+import { setupVrUI } from './vrui.js';
 
 /* ---------- utilità ---------- */
 export const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
@@ -439,8 +440,19 @@ export function startLab(RobotClass, { name, color, program = [], look: lookCfg 
   // aprendo i blocchi la telecamera si allontana per vedere dove cammina il robot
   document.getElementById('bCode').onclick = () => {
     if (coding.isOpen()) coding.close();
-    else { coding.open(); viewIdx = VIEWS.length - 1; setView(viewIdx); document.getElementById('bView').textContent = '🎥 ' + VIEWS[viewIdx].name; }
+    else { coding.open(); viewIdx = VIEWS.length - 1; setView(viewIdx); updateViewLabel(); }
   };
+  // Voce e Vista: le stesse funzioni per i pulsanti del browser e per quelli del visore
+  let vrui = null; // interfaccia del visore (creata più sotto)
+  function toggleVoice() {
+    voiceOn = !voiceOn;
+    document.getElementById('bVoice').textContent = voiceOn ? '🔊 Voce' : '🔇 Voce';
+    if (!voiceOn && 'speechSynthesis' in window) speechSynthesis.cancel();
+  }
+  function updateViewLabel() {
+    document.getElementById('bView').textContent = '🎥 ' + VIEWS[viewIdx].name;
+    if (vrui) vrui.refreshTop();
+  }
 
   // pulsanti HTML
   const box = document.querySelector('.btns');
@@ -448,12 +460,9 @@ export function startLab(RobotClass, { name, color, program = [], look: lookCfg 
     const b = document.createElement('button'); b.textContent = label;
     b.onclick = () => robot.do(id); box.appendChild(b);
   });
-  document.getElementById('bVoice').onclick = e => {
-    voiceOn = !voiceOn; e.target.textContent = voiceOn ? '🔊 Voce' : '🔇 Voce';
-    if (!voiceOn && 'speechSynthesis' in window) speechSynthesis.cancel();
-  };
-  document.getElementById('bView').onclick = e => {
-    viewIdx = (viewIdx + 1) % VIEWS.length; setView(viewIdx); e.target.textContent = '🎥 ' + VIEWS[viewIdx].name;
+  document.getElementById('bVoice').onclick = () => toggleVoice();
+  document.getElementById('bView').onclick = () => {
+    viewIdx = (viewIdx + 1) % VIEWS.length; setView(viewIdx); updateViewLabel();
   };
   /* ======================================================================
      Toccare, prendere e lanciare il robot (torna sempre da solo alla pedana)
@@ -613,52 +622,38 @@ export function startLab(RobotClass, { name, color, program = [], look: lookCfg 
   renderer.domElement.addEventListener('pointerup', mouseUp);
   renderer.domElement.addEventListener('pointercancel', mouseUp);
 
-  /* ---------- pannelli 3D per il visore ---------- */
-  const vrButtons = [];
-  const panels = [];
-  // list = [[id, testo], ...]; onPress(id) quando si preme
-  function makeVrPanel(list, titleText, x, rotY, onPress, y = 1.0, z = -1.15, tilt = -0.55) {
-    const panel = new THREE.Group(); panel.visible = false; scene.add(panel); panels.push(panel);
-    const n = list.length, rows = Math.ceil(n / 2), PH = 0.13 + rows * 0.105;
-    panel.position.set(x, y, z); panel.rotation.set(tilt, rotY, 0, 'YXZ');
-    panel.add(new THREE.Mesh(new THREE.PlaneGeometry(0.52, PH), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.88 })));
-    const { g, tex } = canvasTex(512, 96);
-    g.fillStyle = css; g.font = `800 64px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(titleText, 256, 52);
-    const title = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.075), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
-    title.position.set(0, PH / 2 - 0.055, 0.002); panel.add(title);
-    list.forEach(([id, label], i) => {
-      const { g: bg, tex: bt } = canvasTex(512, 128);
-      bg.fillStyle = '#1d2433'; bg.font = `600 50px ${FONT}`; bg.textAlign = 'center'; bg.textBaseline = 'middle'; bg.fillText(label, 256, 68);
-      const mat = new THREE.MeshBasicMaterial({ color: 0xeef2f8 });
-      const btn = new THREE.Mesh(new THREE.PlaneGeometry(0.23, 0.09), mat);
-      const l = new THREE.Mesh(new THREE.PlaneGeometry(0.23, 0.0575), new THREE.MeshBasicMaterial({ map: bt, transparent: true }));
-      l.position.z = 0.002; btn.add(l);
-      const last = i === n - 1 && n % 2;
-      btn.position.set(last ? 0 : (i % 2 ? 0.122 : -0.122), PH / 2 - 0.15 - Math.floor(i / 2) * 0.105, 0.004);
-      btn.userData = { id, mat, onPress };
-      panel.add(btn); vrButtons.push(btn);
-    });
-  }
-  // a sinistra: le azioni del robot
-  makeVrPanel([...robot.actions, ['__prog', '🧩 Il mio programma']], name, -0.5, 0.45,
-    id => (id === '__prog' ? coding.run() : robot.do(id)));
-  // in alto al centro, sopra il robot: per tornare indietro (nel visore i pulsanti della pagina non si vedono)
+  /* ---------- interfaccia nel visore: la stessa del browser, fatta di pannelli 3D (vedi vrui.js) ---------- */
   const leave = async url => {
     const s = renderer.xr.getSession();
     if (s) { try { await s.end(); } catch { /* già chiusa */ } }
     location.href = url;
   };
-  makeVrPanel([['__game', '⬅ Torna al gioco'], ['__list', '🤖 Tutti i robot']], 'Indietro', 0, 0,
-    id => leave(id === '__game' ? '../index.html' : 'index.html'), 2.0, -1.45, 0.3);
-  // a destra: vestiti e colori
-  if (look) {
-    makeVrPanel([
-      ['hat', '🎩 Cappello'], ['glasses', '👓 Occhiali'], ['bowtie', '🎀 Papillon'], ['cape', '🦸 Mantello'],
-      ['body', '🎨 Colore corpo'], ['accent', '🎨 Colore dettagli'], ['reset', '↺ Com’era prima'],
-    ], 'Personalizza', 0.5, -0.45, id => { if (id === 'reset') look.reset(); else look.cycle(id); pop(1.2); });
+  // Vista nel visore: ti sposta davvero nei punti di vista del browser (e i pannelli ti seguono)
+  let baseRefSpace = null;
+  function setViewXR(i) {
+    if (!renderer.xr.isPresenting || !baseRefSpace) return;
+    const v = VIEWS[i], v0 = VIEWS[0];
+    const pos = new THREE.Vector3(v.pos[0] - v0.pos[0], v.pos[1] - v0.pos[1], v.pos[2] - v0.pos[2]);
+    const d = new THREE.Vector3(v.tgt[0] - v.pos[0], 0, v.tgt[2] - v.pos[2]);
+    const yaw = Math.atan2(-d.x, -d.z); // per guardare verso il robot
+    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -yaw);
+    const p = pos.clone().applyQuaternion(q).negate();
+    const t = new XRRigidTransform({ x: p.x, y: p.y, z: p.z, w: 1 }, { x: q.x, y: q.y, z: q.z, w: q.w });
+    renderer.xr.setReferenceSpace(baseRefSpace.getOffsetReferenceSpace(t));
+    vrui.placeAt(pos, yaw);
   }
+  vrui = setupVrUI({
+    scene, css, FONT, canvasTex, roundRect, robot, name, coding, look,
+    LOOK: { HATS, HAT_NAMES, CAPES, CAPE_NAMES, BODY_COLORS, ACCENT_COLORS },
+    leave, pop,
+    isVoiceOn: () => voiceOn,
+    toggleVoice,
+    VIEWS, getViewIdx: () => viewIdx,
+    nextView: () => { viewIdx = (viewIdx + 1) % VIEWS.length; setView(viewIdx); updateViewLabel(); setViewXR(viewIdx); },
+  });
+  const vrButtons = vrui.buttons;
 
-  const hot = new THREE.Color(color);
+  const hot = new THREE.Color(0xc9d8ff); // pulsante puntato: si scurisce un po'
   const factory = new XRControllerModelFactory();
   const tmpM = new THREE.Matrix4(), xrRay = new THREE.Raycaster();
   const rayFrom = c => {
@@ -667,7 +662,8 @@ export function startLab(RobotClass, { name, color, program = [], look: lookCfg 
     xrRay.ray.direction.set(0, 0, -1).applyMatrix4(tmpM);
     return xrRay;
   };
-  const pick = c => { const h = rayFrom(c).intersectObjects(vrButtons, false); return h.length ? h[0] : null; };
+  const shown = o => { for (; o; o = o.parent) if (!o.visible) return false; return true; };
+  const pick = c => rayFrom(c).intersectObjects(vrButtons, false).find(h => shown(h.object)) || null; // solo pannelli aperti
   function haptic(c, strength, ms) {
     try { const a = c.userData.source && c.userData.source.gamepad && c.userData.source.gamepad.hapticActuators; if (a && a[0]) a[0].pulse(strength, ms); } catch { /* niente */ }
   }
@@ -711,11 +707,21 @@ export function startLab(RobotClass, { name, color, program = [], look: lookCfg 
     }
   }
   renderer.xr.addEventListener('sessionstart', () => {
-    document.body.classList.add('xr'); panels.forEach(p => (p.visible = true));
+    document.body.classList.add('xr');
+    baseRefSpace = renderer.xr.getReferenceSpace();
+    viewIdx = 0; updateViewLabel();
+    vrui.placeAt(new THREE.Vector3(), 0);
+    vrui.show(true);
     // appena si entra nel visore il robot si presenta (il pulsante VR "sblocca" anche l'audio)
     setTimeout(() => { if (!robot.action) robot.do('ciao'); greeted = true; }, 900);
   });
-  renderer.xr.addEventListener('sessionend', () => { document.body.classList.remove('xr'); panels.forEach(p => (p.visible = false)); setView(viewIdx); });
+  renderer.xr.addEventListener('sessionend', () => {
+    document.body.classList.remove('xr');
+    vrui.show(false);
+    renderer.xr.setReferenceSpace(null); // la prossima volta si riparte dalla vista normale
+    baseRefSpace = null;
+    setView(viewIdx);
+  });
 
   /* ---------- pannello "Personalizza" (PC) ---------- */
   if (look) {
@@ -787,7 +793,8 @@ export function startLab(RobotClass, { name, color, program = [], look: lookCfg 
     updateHearts(dt);
     if (renderer.xr.isPresenting) {
       updateVrPet(dt);
-      vrButtons.forEach(b => b.userData.mat.color.setHex(0xeef2f8));
+      vrui.update();
+      vrButtons.forEach(b => b.userData.mat.color.setHex(0xffffff));
       controllers.forEach(c => {
         const h = pick(c);
         if (h) { h.object.userData.mat.color.copy(hot); c.userData.line.scale.z = h.distance; } else c.userData.line.scale.z = 3;
@@ -800,5 +807,6 @@ export function startLab(RobotClass, { name, color, program = [], look: lookCfg 
   const demo = new URLSearchParams(location.search).get('demo');
   if (demo) demo.split(',').forEach((a, i) => setTimeout(() => robot.do(a), 300 + i * 50));
   if (new URLSearchParams(location.search).has('code')) coding.open();
+  window.lab = { robot, coding, vrui, camera, controls }; // utile per fare prove dalla console del browser
   return { robot, lab, coding };
 }

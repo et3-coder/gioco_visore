@@ -19,14 +19,61 @@ function toBlock(it) {
   if (k === 'casa') return { type: 'mv_casa' };
   if (k === 'dici') return { type: 'dici', fields: { TXT: a } };
   if (k === 'aspetta') return { type: 'aspetta', fields: { S: a } };
-  if (k === 'ripeti') return { type: 'ripeti', fields: { N: a }, inputs: { DO: { block: chain(b) } } };
+  if (k === 'ripeti') {
+    const body = chain(b || []);
+    return body ? { type: 'ripeti', fields: { N: a }, inputs: { DO: { block: body } } } : { type: 'ripeti', fields: { N: a } };
+  }
 }
 function chain(list) {
   let first = null, prev = null;
   for (const it of list) { const b = toBlock(it); if (!first) first = b; else prev.next = { block: b }; prev = b; }
   return first;
 }
-const programState = list => ({ blocks: { languageVersion: 0, blocks: [{ type: 'start', x: 30, y: 30, next: { block: chain(list) } }] } });
+const programState = list => {
+  const first = chain(list);
+  const start = { type: 'start', x: 30, y: 30 };
+  if (first) start.next = { block: first };
+  return { blocks: { languageVersion: 0, blocks: [start] } };
+};
+
+// ---- Il programma come "lista di blocchi" (per l'editor nel visore, dove Blockly non c'è) ----
+// Ogni blocco è { t: 'act'|'avanti'|'indietro'|'gira'|'casa'|'dici'|'aspetta'|'ripeti'|'fine', ... }.
+// "ripeti" apre un gruppo che si chiude con "fine": è lo stesso programma salvato da Blockly.
+export function cardsFromState(st) {
+  const starts = (st?.blocks?.blocks || []).filter(b => b.type === 'start').sort((a, b) => (a.y || 0) - (b.y || 0));
+  const out = [];
+  const walk = b => {
+    while (b) {
+      const f = b.fields || {};
+      if (b.type.startsWith('act_')) out.push({ t: 'act', id: b.type.slice(4) });
+      else if (b.type === 'mv_avanti') out.push({ t: 'avanti', n: +f.N || 1 });
+      else if (b.type === 'mv_indietro') out.push({ t: 'indietro', n: +f.N || 1 });
+      else if (b.type === 'mv_gira') out.push({ t: 'gira', dir: f.DIR === 'sx' ? 'sx' : 'dx' });
+      else if (b.type === 'mv_casa') out.push({ t: 'casa' });
+      else if (b.type === 'dici') out.push({ t: 'dici', txt: String(f.TXT ?? 'Ciao!') });
+      else if (b.type === 'aspetta') out.push({ t: 'aspetta', s: +f.S || 1 });
+      else if (b.type === 'ripeti') { out.push({ t: 'ripeti', n: +f.N || 2 }); walk(b.inputs?.DO?.block); out.push({ t: 'fine' }); }
+      b = b.next?.block;
+    }
+  };
+  if (starts.length) walk(starts[0].next?.block);
+  return out;
+}
+export function stateFromCards(cards) {
+  const root = [], stack = [root];
+  for (const c of cards) {
+    const top = stack[stack.length - 1];
+    if (c.t === 'ripeti') { const body = []; top.push(['ripeti', c.n, body]); stack.push(body); }
+    else if (c.t === 'fine') { if (stack.length > 1) stack.pop(); }
+    else if (c.t === 'act') top.push(c.id);
+    else if (c.t === 'avanti' || c.t === 'indietro') top.push([c.t, c.n]);
+    else if (c.t === 'gira') top.push(['gira', c.dir]);
+    else if (c.t === 'casa') top.push(['casa']);
+    else if (c.t === 'dici') top.push(['dici', c.txt]);
+    else if (c.t === 'aspetta') top.push(['aspetta', c.s]);
+  }
+  return programState(root);
+}
 
 export function setupCoding({ robot, name, color, program, lab }) {
   const KEY = 'robotlab-prog-' + name.toLowerCase();
@@ -151,5 +198,18 @@ export function setupCoding({ robot, name, color, program, lab }) {
   }
   function stop() { stopped = true; lab.stopAll(); highlight(null); }
 
-  return { open, close, run, stop, isOpen: () => document.body.classList.contains('coding') };
+  // ---- per l'editor nel visore: stesso programma, letto e scritto nello stesso salvataggio ----
+  const currentState = () => (ws ? window.Blockly.serialization.workspaces.save(ws) : (load() || defaultState));
+  function setState(st) {
+    save(st);
+    if (ws) window.Blockly.serialization.workspaces.load(st, ws); // se l'editor del PC è aperto, si aggiorna anche lui
+  }
+
+  return {
+    open, close, run, stop, isOpen: () => document.body.classList.contains('coding'),
+    isRunning: () => running,
+    getCards: () => cardsFromState(currentState()),
+    setCards: cards => setState(stateFromCards(cards)),
+    resetExample: () => setState(defaultState),
+  };
 }

@@ -67,6 +67,17 @@ Nel laboratorio si può anche:
   Codice: `lab/look.js` (vestiti e colori) e `lab/common.js` (tocco e lancio); i punti di aggancio dei vestiti
   sono in fondo a `lab/binot.html` e `lab/galaxine.html` (`look: {...}`).
 
+**Nel visore l'interfaccia del laboratorio è la stessa del browser** (pannelli 3D, `lab/vrui.js`):
+- in alto: *← Tutti i robot*, *🏠 Torna al gioco*, il nome del robot, *🎨 Personalizza*, *🧩 Programma*, *🔊 Voce*,
+  *🎥 Vista* e il suggerimento; in basso: i pulsanti delle azioni;
+- a destra (*Personalizza*): le stesse scelte del pannello del browser (cappello, occhiali, papillon, mantello,
+  pallini dei colori, *↺ Com'era all'inizio*);
+- a sinistra (*Programma*): *▶ Avvia*, *⏹ Stop*, *↺ Esempio*, *✕* e i blocchi. È **lo stesso programma** salvato
+  dal browser: quello fatto con Blockly sul PC si vede e si modifica nel visore, e viceversa
+  (tocca un blocco della tavolozza per aggiungerlo, tocca un blocco del programma per toglierlo);
+- *🎥 Vista* sposta davvero il giocatore nei punti di vista del browser (Robot, Da vicino, Dal basso, Di lato,
+  Dall'alto) e i pannelli lo seguono.
+
 **AIBI** è l'aiutante: legge le istruzioni ad alta voce (pulsante con l'altoparlante per riascoltarle)
 e dopo 2 tentativi sbagliati dà un suggerimento. Dal livello 10 c'è anche la sfida del "programma più corto".
 
