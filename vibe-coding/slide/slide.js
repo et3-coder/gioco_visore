@@ -267,26 +267,26 @@ const SLIDES = [
   {
     sec: 'IA e LLM',
     html: () => `<div class="head"><p class="eyebrow">Le allucinazioni</p><h2>Vero o falso? AIBI è sicurissimo…</h2></div>
-      <div class="col grow" id="hall" style="justify-content:center;gap:16px"></div>
+      <div class="col grow" id="hall" style="justify-content:center;gap:18px;min-height:0"></div>
       <p class="big center frag">Un’IA può <b>inventare</b> cose con tanta sicurezza: si chiamano <b>allucinazioni</b>. Controllate sempre!</p>`,
     init(root) {
       const items = [
-        ['Il gatto è un mammifero.', true, 'Giusto! Questa volta AIBI aveva ragione.'],
-        ['La Torre di Pisa si trova a Roma. Ne sono sicurissimo! 😎', false, 'Sbagliato! È a Pisa. Sembrava sicuro, ma ha sbagliato.'],
-        ['Un ragno ha 6 zampe.', false, 'Sbagliato! I ragni hanno 8 zampe.'],
-        ['Gemini non sbaglia mai.', false, 'Sbagliato! Tutte le IA possono sbagliare.'],
+        ['Il gatto è un mammifero.', true, 'È vero: questa volta AIBI aveva ragione.'],
+        ['La Torre di Pisa si trova a Roma. Ne sono sicurissimo! 😎', false, 'È falso: è a Pisa. Sembrava sicuro, ma ha sbagliato!'],
+        ['Un ragno ha 6 zampe.', false, 'È falso: i ragni hanno 8 zampe.'],
+        ['Gemini non sbaglia mai.', false, 'È falso: tutte le IA possono sbagliare.'],
       ];
       const box = $('#hall', root);
       box.innerHTML = items.map(([t], i) => `<div class="row" style="align-items:center;gap:18px" data-i="${i}">
         <div class="bot small"><span></span><span></span></div>
         <div class="bubble" style="flex:1;font-size:28px">${esc(t)}</div>
         <button class="btn green" data-v="1">Vero</button><button class="btn pink" data-v="0">Falso</button>
-        <div class="res" style="width:360px;font-size:24px;font-weight:600"></div></div>`).join('');
+        <div class="res" style="width:380px;font-size:23px;font-weight:600;line-height:1.3"></div></div>`).join('');
       $$('[data-i]', box).forEach((row) => {
         const [, truth, why] = items[+row.dataset.i];
         $$('button', row).forEach((b) => (b.onclick = () => {
           const ok = (b.dataset.v === '1') === truth;
-          $('.res', row).textContent = (ok ? '✅ ' : '❌ ') + why;
+          $('.res', row).textContent = (ok ? '✅ Esatto! ' : '❌ No! ') + why;
           $('.res', row).style.color = ok ? '#188a61' : '#b51f6a';
           ok ? sfx.win() : sfx.bump();
         }));
