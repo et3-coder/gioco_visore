@@ -14,6 +14,11 @@ da raccogliere", "metti 3 meteoriti che cadono"...). AIBI, un'IA **simulata**, r
 - **Carte "Parliamone"** (all'inizio, dopo le sfide 5 e 12 e alla fine): domande da discutere a voce. **Nessun dato viene salvato.**
 - Niente servizi esterni, niente chiavi: funziona anche offline. Gemini vero si usa a parte, nella sessione pratica.
 
+**Modalità immagini** (per chi non sa ancora leggere o scrivere): pulsante 🖼️ Immagini in alto, oppure il link
+`…/vibe-coding/?immagini`. Al posto della chat scritta ci sono grandi pulsanti con figure (personaggi, sfondi, colori,
+movimento, cose da prendere, pericoli, regole, 🤔 "qualcosa non va"); AIBI legge tutto ad alta voce con frasi brevi.
+Ogni figura diventa una frase che AIBI capisce come se fosse scritta (`js/pictures.js`).
+
 **Slide per la lezione** (`slide/`): presentazione interattiva da proiettare prima di giocare (IA e LLM, vibe coding,
 il gioco e le sue sfide, Parliamone, Gemini, quiz). Frecce per avanzare, tasto N per le note, F per lo schermo intero.
 Online: `https://et3-coder.github.io/gioco_visore/vibe-coding/slide/`.

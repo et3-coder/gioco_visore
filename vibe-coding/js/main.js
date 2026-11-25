@@ -5,8 +5,9 @@ import { understand } from './understand.js';
 import { newSpec, clone, applyChange, plural } from './spec.js';
 import { generate, diff, highlight } from './codegen.js';
 import { Engine } from './engine.js';
-import { Chat, setVoice, isVoiceOn, unlockAudio, beep } from './chat.js';
-import { CHALLENGES, DISCUSS } from './challenges.js';
+import { Chat, setVoice, isVoiceOn, unlockAudio, beep, speak } from './chat.js';
+import { CHALLENGES, DISCUSS, SHORT } from './challenges.js';
+import { renderPanel, answersFor } from './pictures.js';
 
 const $ = (id) => document.getElementById(id);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -16,6 +17,7 @@ const S = {
   spec: newSpec(), history: [], code: [],
   ci: 0, ev: {}, done: new Set(), discussed: new Set(),
   last: null, pending: null, busy: false, bugIntroduced: false,
+  pics: /[?&]immagini/.test(location.search), // modalità immagini: per chi non sa ancora leggere e scrivere
 };
 const engine = new Engine($('game'), onGameEvent);
 
@@ -68,7 +70,7 @@ $('bPlay').onclick = async () => {
   if (!S.spec.hero) {
     if (S.busy) return;
     S.busy = true; setBusy(true);
-    await chat.aibi('Il gioco è ancora vuoto! Prima ditemi che personaggio volete, per esempio: "fai un gatto".');
+    await chat.aibi(S.pics ? 'Il gioco è vuoto! Prima tocca un personaggio.' : 'Il gioco è ancora vuoto! Prima ditemi che personaggio volete, per esempio: "fai un gatto".');
     S.busy = false; setBusy(false);
     return;
   }
@@ -102,17 +104,39 @@ function setBusy(b) {
   document.querySelectorAll('#examples button, .composer .send').forEach((x) => (x.disabled = b));
 }
 
-async function onSend(text) {
+async function onSend(text, shown) {
   text = text.trim();
   if (!text || S.busy) return;
   unlockAudio();
   $('input').value = '';
   S.busy = true; setBusy(true);
-  chat.user(text);
+  chat.user(shown || text);
   const p = understand(text, S.spec);
   S.last = p;
-  try { await respond(p); checkChallenge(); }
-  finally { S.busy = false; setBusy(false); $('input').focus(); }
+  try { await respond(p); await checkChallenge(); }
+  finally { S.busy = false; setBusy(false); if (!S.pics) $('input').focus(); refreshPics(); }
+}
+
+// ---------------- modalità immagini ----------------
+function refreshPics() {
+  if (!S.pics) return;
+  renderPanel($('pics'), {
+    getSpec: () => S.spec,
+    onPick: (text, label) => onSend(text, label),
+    speak: (t) => { if (isVoiceOn()) speak(t); },
+    hints: S.done.has(S.ci) ? [] : SHORT[S.ci].tabs,
+    answers: answersFor(S.pending, S.spec),
+    disabled: () => S.busy,
+  });
+}
+function applyMode() {
+  $('examples').hidden = S.pics;
+  $('form').hidden = S.pics;
+  $('pics').hidden = !S.pics;
+  $('bMode').textContent = S.pics ? '⌨️ Scrivo' : '🖼️ Immagini';
+  history.replaceState(null, '', location.pathname + (S.pics ? '?immagini' : ''));
+  if (S.pics && SHORT[S.ci].writeOnly && !S.done.has(S.ci)) { S.done.add(S.ci); showChallenge(); }
+  refreshPics();
 }
 
 async function commit(changes, { intro = 'Ecco fatto: ', extra = '' } = {}) {
@@ -165,6 +189,7 @@ async function respond(p) {
         const what = p.target === 'items' ? plural(p.kindName || S.spec.items?.kind || 'stella') : plural(p.kindName || S.spec.enemies?.kind || 'meteorite');
         return chat.aibi(`Quante ${what}, esattamente? "Tante" per me non è un numero: potrebbero essere 3 o 100! Scrivetemi un numero.`.replace(/^Quante (\w+i),/, 'Quanti $1,'));
       }
+      if (S.pics) return chat.aibi(p.ask === 'number' || p.ask === 'many' ? 'Quanti, esattamente? Tocca un numero!' : p.ask === 'hard' ? 'Più difficile come? Tocca una figura!' : 'Più bello come? Tocca una figura!');
       if (p.ask === 'hard') return chat.aibi('Più difficile... in che modo? Per me "difficile" non vuol dire niente di preciso! Posso mettere più nemici, nemici più veloci, meno vite o meno tempo. Ditemi esattamente cosa volete, per esempio: "metti 6 meteoriti".');
       if (p.ask === 'many') return chat.aibi('Tanti cosa? E quanti, esattamente? Per me "tanti" non è un numero! Scrivetemi per esempio: "metti 10 stelle".');
       return chat.aibi('Più bello... come? Io non so cosa vi piace! Posso cambiare il colore, lo sfondo, la grandezza, aggiungere musica... Ditemi una cosa precisa, per esempio: "fallo viola nello spazio".');
@@ -201,6 +226,7 @@ async function respond(p) {
         await chat.aibi(`Avete ragione, scusate! Nel codice ho scritto "velocità: ${wrong}", che è più piccolo di 1: così il personaggio va più piano, non più veloce! Ho sbagliato il calcolo, anche se ero sicurissimo. Ora la velocità è ${fixed.hero.speed}: riprovate!`);
         return writeCode();
       }
+      if ((S.spec.bug || S.spec.speedBug) && S.pics) return chat.aibi('Davvero? Io ero sicurissimo... Tocca 🤔 e dimmi cosa non va!');
       if (S.spec.bug || S.spec.speedBug) return chat.aibi(`Davvero? Io ero sicurissimo... Cosa non funziona, esattamente? Descrivetemi cosa succede quando giocate, per esempio: "${S.spec.bug ? 'quando prendo una moneta i punti non salgono' : 'il personaggio è più lento di prima'}".`);
       if (p.about === 'speed' && S.spec.hero) return chat.aibi(`Ho controllato il codice: la velocità del personaggio è ${S.spec.hero.speed}. Se lo volete più veloce, scrivetemi "fallo più veloce".`);
       if (p.about === 'move' && !S.spec.controls) return chat.aibi('Non mi avete ancora detto come si deve muovere! Scrivetemi per esempio: "si muove con le frecce" oppure "salta con lo spazio". E ricordatevi di cliccare sul gioco prima di usare la tastiera.');
@@ -255,9 +281,11 @@ async function loadChallenge(i) {
   showChallenge();
   chat.system(`— Sfida ${i + 1}: ${CHALLENGES[i].title} —`);
   S.busy = true; setBusy(true);
-  await chat.aibi(CHALLENGES[i].intro);
+  await chat.aibi(S.pics ? SHORT[i].intro : CHALLENGES[i].intro);
+  if (S.pics && SHORT[i].writeOnly && !S.done.has(i)) { S.done.add(i); showChallenge(); }
   S.busy = false; setBusy(false);
-  $('input').focus();
+  if (!S.pics) $('input').focus();
+  refreshPics();
 }
 async function checkChallenge() {
   const ch = CHALLENGES[S.ci];
@@ -267,7 +295,8 @@ async function checkChallenge() {
   sfxDone();
   const wasBusy = S.busy;
   S.busy = true; setBusy(true);
-  await chat.aibi('✅ Sfida completata! ' + ch.lesson);
+  await chat.aibi('✅ Sfida completata! ' + (S.pics ? SHORT[S.ci].lesson : ch.lesson));
+  refreshPics();
   if (!wasBusy) { S.busy = false; setBusy(false); }
 }
 function sfxDone() { [660, 880, 1100].forEach((f, i) => setTimeout(beep, i * 90)); }
@@ -302,6 +331,7 @@ function discuss(key, then) {
   stopGame();
   modal(`<h2>💬 ${d.title}</h2>${d.questions.map((q) => `<div class="q">${q}</div>`).join('')}
     <p class="small">Discutetene insieme: il gioco non registra le risposte.</p>`, [['Ne abbiamo parlato ✓', then, true]]);
+  if (S.pics && isVoiceOn()) speak(d.title + '. ' + d.questions.join(' '));
 }
 
 const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -334,6 +364,7 @@ function explain() {
     <p>${why}</p>${fixNote}
     <p class="small">Io non capisco come una persona: riconosco solo alcune parole. Gemini è molto più grande e lavora in un altro modo (impara dalle probabilità delle parole), ma anche lui non “pensa” come noi.</p>`,
   [['Ho capito ✓', null, true]]);
+  if (S.pics && isVoiceOn()) speak(why);
 }
 
 function challengeMenu() {
@@ -351,11 +382,14 @@ $('bNew').onclick = () => { if (!S.busy) onSend('nuovo gioco'); };
 $('bExplain').onclick = explain;
 $('bNext').onclick = next;
 $('bChallenges').onclick = challengeMenu;
+$('bMode').onclick = () => { S.pics = !S.pics; applyMode(); };
+$('bChSay').onclick = () => { unlockAudio(); speak(S.pics ? SHORT[S.ci].intro : CHALLENGES[S.ci].text); };
 $('bVoice').onclick = () => { setVoice(!isVoiceOn()); $('bVoice').textContent = isVoiceOn() ? '🔊 Voce' : '🔇 Voce'; };
 S.code = generate(S.spec);
 renderCode(S.code);
 engine.setSpec(S.spec);
 showChallenge();
+applyMode();
 discuss('start', () => { unlockAudio(); loadChallenge(0); });
 
 // utile per fare prove dalla console del browser

@@ -283,7 +283,7 @@ export class Engine {
     if (!this.playing && !this.over) {
       if (!s.hero) {
         this.center('✨ Il gioco è ancora vuoto', H / 2 - 18, 34, s);
-        this.center('Scrivi ad AIBI cosa vuoi creare!', H / 2 + 22, 22, s);
+        this.center('Chiedi ad AIBI cosa vuoi creare! 👉', H / 2 + 22, 22, s);
       } else {
         const msg = s.controls ? 'Anteprima · premi ▶ Gioca per provarlo' : 'Anteprima · il personaggio non si muove ancora: chiedilo ad AIBI!';
         this.pill(msg, W / 2, H - 42, 'center');

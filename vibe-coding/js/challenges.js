@@ -131,6 +131,25 @@ export const CHALLENGES = [
   },
 ];
 
+// Versione per la "modalità immagini" (chi non sa ancora leggere): frasi brevi lette da AIBI,
+// schede dei pulsanti da far pulsare e sfide che richiedono la scrittura (si possono saltare).
+export const SHORT = [
+  { intro: 'Ciao! Io sono AIBI. Scegli un personaggio e uno sfondo!', lesson: 'Bravo! Hai creato il tuo personaggio!', tabs: ['hero', 'bg', 'color'] },
+  { intro: 'Adesso fallo muovere! Poi premi Gioca.', lesson: 'Si muove! Bravissimo!', tabs: ['move'] },
+  { intro: 'Aggiungi delle cose da prendere!', lesson: 'Le hai prese! Che bello!', tabs: ['items'] },
+  { intro: 'Metti dei pericoli e le vite!', lesson: 'Che avventura!', tabs: ['enemies', 'rules'] },
+  { intro: 'Cambia le cose da prendere. Poi gioca e controlla bene!', lesson: 'Avevi ragione tu! Anche le IA sbagliano.', tabs: ['items'] },
+  { intro: 'Tocca la stellina magica: più bello!', lesson: 'Con le parole precise ti capisco meglio!', tabs: ['special'] },
+  { intro: 'Scegli come si vince! Poi gioca.', lesson: 'Hai vinto! Il gioco è tuo!', tabs: ['rules'] },
+  { intro: 'Questa sfida è per chi sa scrivere. La saltiamo!', lesson: '', tabs: [], writeOnly: true },
+  { intro: 'Tocca il dado della sorpresa!', lesson: 'Tante cose insieme!', tabs: ['special'] },
+  { intro: 'Cambia qualcosa, poi tocca la freccia indietro!', lesson: 'Si può sempre tornare indietro!', tabs: ['bg', 'special'] },
+  { intro: 'Tocca il diavoletto: più difficile! Poi gioca.', lesson: 'Bravo! Mi hai detto cosa volevi.', tabs: ['special'] },
+  { intro: 'Fai il personaggio più veloce. Poi gioca e controlla!', lesson: 'Hai trovato il mio errore!', tabs: ['move'] },
+  { intro: 'Chiedimi un personaggio famoso!', lesson: 'I personaggi famosi non si copiano!', tabs: ['special', 'hero'] },
+  { intro: 'Metti un timer e i punti per vincere!', lesson: 'Una corsa contro il tempo!', tabs: ['rules', 'items'] },
+  { intro: 'Inventa il tuo gioco!', lesson: 'Sei bravissimo!', tabs: ['hero', 'bg', 'move', 'items', 'enemies', 'rules'] },
+];
 // Carte "Parliamone": domande da discutere insieme. Il gioco non registra le risposte.
 export const DISCUSS = {
   start: {

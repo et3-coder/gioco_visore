@@ -11,6 +11,7 @@
     <div class="brand">🤖 Crea il tuo gioco con AIBI</div>
     <div id="title" class="mission">Vibe coding</div>
     <div class="tools">
+      <button id="bMode" title="Comandi con le immagini (per chi non sa ancora scrivere) oppure scrivendo">🖼️ Immagini</button>
       <button id="bVoice" title="Accendi o spegni la voce di AIBI">🔊 Voce</button>
       <button id="bChallenges" title="Scegli la sfida">🏆 Sfide</button>
     </div>
@@ -44,10 +45,12 @@
           <b id="chTitle"></b>
           <div id="chText"></div>
         </div>
+        <button id="bChSay" class="say" title="Ascolta la sfida">🔊</button>
         <button id="bNext" hidden>Prossima sfida ▶</button>
       </div>
       <div id="chat" class="chat"></div>
       <div id="examples" class="examples"></div>
+      <div id="pics" class="pics" hidden></div>
       <form id="form" class="composer">
         <input id="input" autocomplete="off" maxlength="200" placeholder="Scrivi ad AIBI cosa vuoi nel gioco…">
         <button class="send" type="submit">Invia ➤</button>

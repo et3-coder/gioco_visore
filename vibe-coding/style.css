@@ -104,6 +104,27 @@ section { background: var(--card); border-radius: 20px; box-shadow: 0 6px 24px r
 .challenge.done { background: #e3f8ec; }
 .challenge.done b { color: #1c8a52; }
 .challenge button { background: #ff3fa4; color: #fff; padding: 8px 14px; font-weight: 700; white-space: nowrap; }
+.challenge button.say { background: #fff; color: #3b2a99; font-size: 22px; padding: 6px 10px; box-shadow: 0 2px 0 #e6d9a8; }
+
+/* ---------- modalità immagini ---------- */
+.pics { border-top: 1px solid #edf0f5; padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+.pics[hidden], .composer[hidden], .examples[hidden] { display: none; }
+.pics-tabs, .pics-items, .pics-special, .pics-ask { display: flex; flex-wrap: wrap; gap: 8px; }
+.pics-ask { background: #fff7e0; border-radius: 14px; padding: 8px; font-size: 28px; align-items: center; animation: askIn .4s; }
+@keyframes askIn { from { transform: scale(.9); opacity: 0; } }
+.ptab { width: 54px; height: 50px; font-size: 28px; background: var(--soft); border-radius: 14px; }
+.ptab.on { background: var(--violet); box-shadow: 0 3px 0 #4a2fd6; }
+.pbtn { min-width: 64px; height: 64px; padding: 0 10px; font-size: 36px; background: #fff; border-radius: 16px; box-shadow: 0 4px 0 #d5dbe6, 0 0 0 2px #e6eaf2; display: inline-flex; align-items: center; justify-content: center; }
+.pbtn:active { transform: translateY(3px); box-shadow: 0 1px 0 #d5dbe6, 0 0 0 2px #e6eaf2; }
+.pbtn .pi { line-height: 1; white-space: nowrap; }
+.pbtn .sw { width: 40px; height: 40px; border-radius: 50%; display: block; box-shadow: inset 0 0 0 3px rgba(0, 0, 0, .12); }
+.pbtn.ans { background: #fff; font-size: 30px; font-weight: 800; color: #3b2a99; }
+.pbtn.sp { min-width: 54px; height: 50px; font-size: 26px; background: #f3efff; }
+.pbtn.sp.on { background: #ffd23f; }
+.pics-items.bugs .pbtn { background: #fff2f5; font-size: 30px; }
+.hint { animation: hintPulse 1.2s ease-in-out infinite; }
+@keyframes hintPulse { 50% { box-shadow: 0 0 0 5px #ffd23f; } }
+.msg.user.pic { font-size: 22px; }
 
 /* ---------- finestre ---------- */
 .modal { position: fixed; inset: 0; background: rgba(20, 24, 40, .45); display: flex; align-items: center; justify-content: center; z-index: 10; padding: 16px; }
