@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Crea il tuo gioco con AIBI</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="brand">🤖 Crea il tuo gioco con AIBI</div>
+    <div id="title" class="mission">Vibe coding</div>
+    <div class="tools">
+      <button id="bVoice" title="Accendi o spegni la voce di AIBI">🔊 Voce</button>
+      <button id="bChallenges" title="Scegli la sfida">🏆 Sfide</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- SINISTRA: il gioco e il codice -->
+    <section id="left">
+      <div class="bar">
+        <button id="bPlay" class="go">▶ Gioca</button>
+        <button id="bUndo" title="Torna alla versione precedente">↶ Annulla</button>
+        <button id="bExplain" title="Guarda come AIBI ha letto la tua ultima frase">🔍 Come mi hai capito?</button>
+        <button id="bNew" title="Ricomincia da un gioco vuoto">🗑️ Nuovo gioco</button>
+      </div>
+      <div id="stage"><canvas id="game" tabindex="0"></canvas></div>
+      <div class="codeHead">📝 Il codice scritto da AIBI <span class="small">le righe verdi sono quelle nuove</span></div>
+      <div id="code" class="code"></div>
+    </section>
+
+    <!-- DESTRA: la chat con AIBI -->
+    <section id="right">
+      <div class="chatHead">
+        <div class="avatar"><span></span><span></span></div>
+        <div>
+          <div class="name">AIBI</div>
+          <div id="aibiStatus" class="status">assistente IA (simulata) · online</div>
+        </div>
+      </div>
+      <div id="challenge" class="challenge">
+        <div>
+          <b id="chTitle"></b>
+          <div id="chText"></div>
+        </div>
+        <button id="bNext" hidden>Prossima sfida ▶</button>
+      </div>
+      <div id="chat" class="chat"></div>
+      <div id="examples" class="examples"></div>
+      <form id="form" class="composer">
+        <input id="input" autocomplete="off" maxlength="200" placeholder="Scrivi ad AIBI cosa vuoi nel gioco…">
+        <button class="send" type="submit">Invia ➤</button>
+      </form>
+    </section>
+  </main>
+
+  <div id="modal" class="modal" hidden>
+    <div class="card">
+      <div id="modalBody"></div>
+      <div id="modalBtns" class="modalBtns"></div>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
