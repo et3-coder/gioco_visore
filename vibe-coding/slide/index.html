@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IA e vibe coding con AIBI</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🤖%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="slide.css">
+</head>
+<body>
+  <div id="viewport"><div id="stage"></div></div>
+
+  <div id="bar">
+    <button id="bPrev" title="Indietro (freccia sinistra)">◀</button>
+    <button id="bNext" title="Avanti (freccia destra o spazio)">▶</button>
+    <span id="count">1 / 1</span>
+    <div id="progress"><i></i></div>
+    <span id="section"></span>
+    <button id="bSay" title="AIBI legge la slide">🔊</button>
+    <button id="bMenu" title="Indice delle slide">☰ Indice</button>
+    <button id="bNotes" title="Note per chi spiega (tasto N)">📝 Note</button>
+    <button id="bFull" title="Schermo intero (tasto F)">⛶</button>
+  </div>
+  <div id="notes"></div>
+  <div id="menu" hidden><div class="menuCard"><div id="menuList"></div><button id="menuClose">Chiudi</button></div></div>
+
+  <script type="module" src="slide.js"></script>
+</body>
+</html>

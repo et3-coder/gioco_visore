@@ -14,6 +14,10 @@ da raccogliere", "metti 3 meteoriti che cadono"...). AIBI, un'IA **simulata**, r
 - **Carte "Parliamone"** (all'inizio, dopo le sfide 5 e 12 e alla fine): domande da discutere a voce. **Nessun dato viene salvato.**
 - Niente servizi esterni, niente chiavi: funziona anche offline. Gemini vero si usa a parte, nella sessione pratica.
 
+**Slide per la lezione** (`slide/`): presentazione interattiva da proiettare prima di giocare (IA e LLM, vibe coding,
+il gioco e le sue sfide, Parliamone, Gemini, quiz). Frecce per avanzare, tasto N per le note, F per lo schermo intero.
+Online: `https://et3-coder.github.io/gioco_visore/vibe-coding/slide/`.
+
 Tasti nel gioco: frecce (o WASD) per muoversi, barra spaziatrice per saltare. Clicca sul gioco prima di usare la tastiera.
 
 ## Avviarlo sul PC

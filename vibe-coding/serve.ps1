@@ -20,7 +20,7 @@ try {
     $res = $ctx.Response
     try {
       $path = [Uri]::UnescapeDataString($ctx.Request.Url.AbsolutePath.TrimStart('/'))
-      if ($path -eq '') { $path = 'index.html' }
+      if ($path -eq '' -or $path.EndsWith('/')) { $path = $path + 'index.html' }
       $file = [System.IO.Path]::GetFullPath((Join-Path $root $path))
       if ($file.StartsWith($root) -and (Test-Path -LiteralPath $file -PathType Leaf)) {
         $ext = [System.IO.Path]::GetExtension($file).ToLower()
