@@ -52,23 +52,29 @@ function wrap(g, text, maxW) {
 let voiceOn = true;
 // La sintesi vocale del browser non sempre funziona (sul visore spesso mancano le voci italiane):
 // per questo il robot "parla" anche con la sua voce da robot (bip e sillabe), che si sente sempre.
-const hasTTS = () => 'speechSynthesis' in window && speechSynthesis.getVoices().length > 0;
+// La voce vera si prova SEMPRE (il browser del visore spesso dice di non avere voci, ma parla lo stesso);
+// i bip forti partono solo se la voce vera non parte davvero.
 if ('speechSynthesis' in window) speechSynthesis.getVoices(); // avvia il caricamento delle voci
+let speakId = 0;
 export function speak(text, pitch = 1.2) {
   if (!voiceOn) return;
   const clean = text.replace(/\n/g, ' ').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}♪]/gu, '').trim();
-  const tts = hasTTS();
-  babble(clean, pitch, tts ? 0.05 : 0.12); // con la voce vera i bip sono più piano
-  if (!tts) return;
+  const id = ++speakId;
+  babble(clean, pitch, 0.05); // un po' di "accento da robot", piano
+  const fallback = () => { if (id === speakId) babble(clean, pitch, 0.12); };
+  if (!('speechSynthesis' in window)) return fallback();
   try {
     speechSynthesis.cancel();
-    speechSynthesis.resume(); // Chrome a volte resta "in pausa"
     const u = new SpeechSynthesisUtterance(clean);
     u.lang = 'it-IT'; u.pitch = pitch; u.rate = 1.02;
     const v = speechSynthesis.getVoices().find(v => v.lang && v.lang.toLowerCase().startsWith('it'));
     if (v) u.voice = v;
-    setTimeout(() => speechSynthesis.speak(u), 60); // subito dopo cancel() a volte la frase si perde
-  } catch { /* niente voce: restano i bip */ }
+    let started = false;
+    u.onstart = () => { started = true; };
+    u.onerror = e => { if (!started && e.error !== 'interrupted' && e.error !== 'canceled') fallback(); };
+    speechSynthesis.speak(u);
+    setTimeout(() => { if (!started && !speechSynthesis.speaking) fallback(); }, 1200);
+  } catch { fallback(); }
 }
 // "voce da robot": una sillaba sintetizzata ogni ~3 lettere, con note che salgono e scendono
 function babble(text, pitch, vol) {

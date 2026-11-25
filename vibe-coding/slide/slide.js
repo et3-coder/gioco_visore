@@ -1,13 +1,14 @@
 // Slide interattive per spiegare ai bambini l'IA, gli LLM, il vibe coding e il gioco "Crea il tuo gioco con AIBI".
-// Pensate anche per chi NON sa leggere e ha poca attenzione: AIBI legge ogni slide, tutto si tocca per ascoltarlo,
-// poche parole e tante immagini, attività brevi, pause in cui si fa il robot, stelline premio.
-// Riusa i moduli del gioco (sfide, comprensione delle frasi, codice, pulsanti a immagini, voce). Nessun dato salvato.
+// Pensate anche per chi NON sa leggere e ha poca attenzione: poche parole e tante immagini (le frasi le legge l'adulto),
+// attività brevi, pause in cui si fa il robot, stelline premio.
+// Riusa i moduli del gioco (sfide, comprensione delle frasi, codice, pulsanti a immagini, suoni). Le slide non parlano.
+// Nessun dato salvato.
 import { CHALLENGES, DISCUSS, SHORT } from '../js/challenges.js';
 import { understand } from '../js/understand.js';
 import { newSpec, clone, applyChange } from '../js/spec.js';
 import { generate, diff, highlight } from '../js/codegen.js';
 import { renderPanel, answersFor } from '../js/pictures.js';
-import { speak, unlockAudio, beep, sfx, tone } from '../js/chat.js';
+import { unlockAudio, beep, sfx, tone } from '../js/chat.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -16,12 +17,10 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const plain = (html) => { const d = document.createElement('div'); d.innerHTML = html; return d.textContent.replace(/\s+/g, ' ').trim(); };
 
-// ---------------- voce, stelline, coriandoli ----------------
-let autoVoice = true;
+// ---------------- stelline e coriandoli ----------------
+// le slide non parlano: "say" anima solo la bocca di AIBI (cosa dire è nelle note per l'adulto, tasto N)
 function say(text) {
   if (!text) return;
-  unlockAudio();
-  speak(text);
   const root = roots[cur];
   if (root) $$('.bot', root).forEach((b) => { b.classList.add('talk'); clearTimeout(b._t); b._t = setTimeout(() => b.classList.remove('talk'), Math.min(9000, 400 + text.length * 60)); });
 }
@@ -197,10 +196,10 @@ const SLIDES = [
     html: () => `<div class="row grow" style="align-items:center;gap:70px">
       <div class="col" style="gap:28px"><p class="eyebrow">Oggi</p>
         <h1>Parliamo con le IA e creiamo un gioco!</h1>
-        <p class="big muted">👆 Tocca le cose per ascoltarle</p></div>
+        <p class="big muted">👆 Tocca e scopri!</p></div>
       <div class="bot float" data-say="Ciao! Io sono AIBI!"><span></span><span></span></div></div>`,
     say: 'Ciao! Io sono AIBI. Oggi giochiamo con le intelligenze artificiali e creiamo un videogioco! Puoi toccare le cose per ascoltarle.',
-    notes: 'Al primo clic la voce si attiva. In basso: 🔁 riascolta, “Auto” accende o spegne la lettura automatica, ⭐ conta le stelline. Fai toccare AIBI al bambino.',
+    notes: 'Le slide non parlano: leggi tu le frasi al bambino (il testo “da dire” è qui sotto, in ogni slide). In basso ⭐ conta le stelline. Fai toccare AIBI al bambino.',
   },
   {
     sec: 'Benvenuti',
@@ -210,7 +209,7 @@ const SLIDES = [
           .map(([i, t]) => `<div class="card frag" data-say="${t}" style="flex:1;align-items:center;text-align:center;padding:40px 16px"><div class="ico-l">${i}</div><h3>${t}</h3></div>`).join('')}
       </div>`,
     say: 'Oggi scopriamo cos’è un’intelligenza artificiale, facciamo il robot, impariamo il vibe coding, giochiamo e alla fine facciamo un quiz!',
-    notes: 'Freccia → per far comparire le tappe una alla volta. Ogni carta si tocca per ascoltarla.',
+    notes: 'Freccia → per far comparire le tappe una alla volta. Quando il bambino tocca una carta, leggigliela tu.',
   },
   {
     sec: 'Benvenuti',
@@ -218,7 +217,7 @@ const SLIDES = [
       ${flipCards(DISCUSS.start.questions.map((q, i) => ({ ico: ['🤔', '💬'][i], front: 'Tocca!', back: `<p class="big">${esc(q)}</p>` })), { height: 420 })}`,
     init: (root) => bindFlips(root),
     say: 'Prima di cominciare, parliamone! Tocca le carte.',
-    notes: 'AIBI legge le domande quando le carte si girano. Lascia rispondere a voce, senza correggere: serve a capire cosa pensa il bambino dell’IA.',
+    notes: 'Leggi tu le domande quando le carte si girano. Lascia rispondere a voce, senza correggere: serve a capire cosa pensa il bambino dell’IA.',
   },
 
   // ===== IA e LLM =====
@@ -237,7 +236,7 @@ const SLIDES = [
       ], { cols: 4, height: 260 })}`,
     init: (root) => bindFlips(root),
     say: 'È intelligenza artificiale? Prima indovina, poi tocca la carta!',
-    notes: 'Prima fai indovinare (pollice su o giù), poi gira la carta: AIBI legge la risposta. Messaggio: un’IA impara dagli esempi; una macchina normale segue regole fisse.',
+    notes: 'Prima fai indovinare (pollice su o giù), poi gira la carta e leggi la risposta. Messaggio: un’IA impara dagli esempi; una macchina normale segue regole fisse.',
   },
   {
     sec: 'IA e LLM',
@@ -288,7 +287,7 @@ const SLIDES = [
       reset();
     },
     say: 'Facciamo finta di essere un LLM! Tocca la parola che viene dopo. La barra lunga vuol dire: molto probabile.',
-    notes: 'Il bambino tocca le parole (con l’immagine accanto): AIBI le legge. La barra più lunga = la parola più probabile. Alla fine AIBI legge tutta la storia. Le probabilità sono inventate per il gioco.',
+    notes: 'Il bambino tocca le parole (con l’immagine accanto): leggi tu le parole. La barra più lunga = la parola più probabile. Alla fine leggi tutta la storia. Le probabilità sono inventate per il gioco.',
   },
   {
     sec: 'IA e LLM',
@@ -322,7 +321,7 @@ const SLIDES = [
     notes: 'Per i più grandi: il “caso” si chiama temperatura. Per questo Gemini può rispondere in modo diverso alla stessa domanda.',
   },
   pauseSlide(0, 'Tu sei il robot!', 'Pausa robot! Adesso tu sei il robot. Io ti do i comandi: ascolta e fai quello che dico!',
-    'Il bambino si alza e fa ciò che dice AIBI (3 secondi per comando). Collegamento: i comandi sono un programma, il bambino è il computer che lo esegue.'),
+    'Leggi tu ogni comando quando compare (3 secondi ciascuno): il bambino lo esegue. Collegamento: i comandi sono un programma, il bambino è il computer che lo esegue.'),
   {
     sec: 'IA e LLM',
     html: () => `<div class="head"><p class="eyebrow">Attenzione</p><h2>Un’IA non è una persona</h2></div>
@@ -348,13 +347,11 @@ const SLIDES = [
       const box = $('#hall', root);
       let right = 0;
       box.innerHTML = items.map(([t], i) => `<div class="row" style="align-items:center;gap:18px" data-row="${i}">
-        <button class="ear" data-ear="${i}">🔊</button>
         <div class="bubble" style="flex:1;font-size:30px" data-say="${esc(t)}">${esc(t)}</div>
         <button class="btn green" data-v="1" style="font-size:40px">👍</button><button class="btn pink" data-v="0" style="font-size:40px">👎</button>
         <div class="res" style="width:90px;font-size:64px;text-align:center"></div></div>`).join('');
       $$('[data-row]', box).forEach((row) => {
         const [t, truth, why] = items[+row.dataset.row];
-        $('[data-ear]', row).onclick = () => say(t);
         $$('[data-v]', row).forEach((b) => (b.onclick = () => {
           if (row.dataset.done) return;
           const ok = (b.dataset.v === '1') === truth;
@@ -367,7 +364,7 @@ const SLIDES = [
       });
     },
     say: 'Vero o falso? Ascolta AIBI e tocca il pollice su se è vero, il pollice giù se è falso. Attento: AIBI a volte sbaglia, anche quando è sicurissimo!',
-    notes: 'Tocca 🔊 per far leggere ogni frase. Messaggio: “sicuro” non vuol dire “giusto”. Si chiamano allucinazioni. Nel gioco AIBI sbaglierà apposta in due sfide.',
+    notes: 'Leggi tu ogni frase. Messaggio: “sicuro” non vuol dire “giusto”. Si chiamano allucinazioni. Nel gioco AIBI sbaglierà apposta in due sfide.',
   },
   {
     sec: 'IA e LLM',
@@ -634,7 +631,7 @@ const SLIDES = [
       }));
     },
     say: 'Adesso proviamo Gemini, un’intelligenza artificiale vera! Tocca una figura e scegli cosa chiedergli.',
-    notes: 'Il bambino sceglie un’immagine (AIBI legge la richiesta); l’adulto copia (📋) e incolla in Gemini, poi legge la risposta ad alta voce. Il terzo è vibe coding vero.',
+    notes: 'Il bambino sceglie un’immagine (leggi tu la richiesta); l’adulto copia (📋) e incolla in Gemini, poi legge la risposta ad alta voce. Il terzo è vibe coding vero.',
   },
   {
     sec: 'Dopo il gioco',
@@ -649,7 +646,7 @@ const SLIDES = [
   {
     sec: 'Dopo il gioco',
     html: () => `<div class="row" style="align-items:center;justify-content:space-between"><div class="head"><p class="eyebrow">Quiz</p><h2 id="qTitle">Domanda 1</h2></div><div class="dots" id="qDots"></div></div>
-      <div class="row" style="align-items:center;gap:18px"><button class="ear" id="qEar">🔊</button><p class="big" id="qText" style="font-weight:800"></p></div>
+      <div class="row" style="align-items:center;gap:18px"><p class="big" id="qText" style="font-weight:800"></p></div>
       <div class="qpic grow" id="qOpts"></div>
       <div class="row" style="align-items:center;gap:20px;min-height:80px"><p class="big grow" id="qWhy"></p><button class="btn" id="qNext" hidden>Avanti ▶</button></div>`,
     init(root) {
@@ -681,7 +678,6 @@ const SLIDES = [
         if (readNow) read();
       };
       root._read = read;
-      $('#qEar', root).onclick = read;
       $('#qNext', root).onclick = () => {
         if (i + 1 < QUIZ.length) { i++; show(true); return; }
         $('#qTitle', root).textContent = 'Fine!';
@@ -695,10 +691,8 @@ const SLIDES = [
       };
       show(false);
     },
-    // all'arrivo sulla slide AIBI legge la domanda (se non ha ancora risposto)
-    onEnter(root) { if (autoVoice && root._read && $('#qNext', root).hidden && $('#qOpts .qopt', root)) setTimeout(() => { if (roots[cur] === root) root._read(); }, 350); },
     say: '',
-    notes: 'AIBI legge domanda e risposte (🔊 per riascoltare). Il bambino tocca l’immagine giusta. Ogni risposta giusta dà una stellina. Il punteggio non viene salvato.',
+    notes: 'Leggi tu domanda e risposte. Il bambino tocca l’immagine giusta. Ogni risposta giusta dà una stellina. Il punteggio non viene salvato.',
   },
   {
     sec: 'Dopo il gioco', cls: 'dark',
@@ -746,13 +740,12 @@ function go(i, { back = false } = {}) {
   $('#count').textContent = `${i + 1} / ${SLIDES.length}`;
   $('#progress i').style.width = ((i + 1) / SLIDES.length) * 100 + '%';
   $('#section').textContent = s.sec;
-  $('#notes').innerHTML = `<b>Slide ${i + 1} · note per chi spiega:</b> ${esc(s.notes || '')}`;
+  $('#notes').innerHTML = `<b>Slide ${i + 1} · note per chi spiega:</b> ${esc(s.notes || '')}${s.say ? '<br><b>Da dire:</b> «' + esc(s.say) + '»' : ''}`;
   history.replaceState(null, '', '#' + (i + 1));
-  if (autoVoice && s.say) setTimeout(() => { if (cur === i) say(s.say); }, 350);
 }
 function next() {
   const hidden = $$('.frag:not(.shown)', roots[cur]);
-  if (hidden.length) { hidden[0].classList.add('shown'); if (hidden[0].dataset.say && autoVoice) say(hidden[0].dataset.say); return; }
+  if (hidden.length) { hidden[0].classList.add('shown'); return; }
   go(cur + 1);
 }
 function prev() {
@@ -761,12 +754,11 @@ function prev() {
   go(cur - 1, { back: true });
 }
 
-// tocca per ascoltare
+// tocco su una carta: lampeggia, così l'adulto vede cosa ha toccato il bambino e glielo legge
 stage.addEventListener('click', (e) => {
   unlockAudio();
   const el = e.target.closest('[data-say]');
   if (!el || e.target.closest('button:not([data-say]), .flip, a')) return;
-  say(el.dataset.say || el.textContent.trim());
   el.classList.remove('say-on'); void el.offsetWidth; el.classList.add('say-on');
 });
 
@@ -786,8 +778,6 @@ function toggleFull() { if (document.fullscreenElement) document.exitFullscreen(
 
 $('#bNext').onclick = () => { unlockAudio(); next(); };
 $('#bPrev').onclick = () => { unlockAudio(); prev(); };
-$('#bSay').onclick = () => { const s = SLIDES[cur]; if (s.say) say(s.say); else if (roots[cur]._read) roots[cur]._read(); };
-$('#bAuto').onclick = () => { autoVoice = !autoVoice; $('#bAuto').textContent = autoVoice ? '🔊 Auto: sì' : '🔇 Auto: no'; };
 $('#bNotes').onclick = () => $('#notes').classList.toggle('on');
 $('#bFull').onclick = toggleFull;
 $('#bMenu').onclick = () => {
@@ -802,11 +792,8 @@ $('#bMenu').onclick = () => {
   $('#menu').hidden = false;
 };
 $('#menuClose').onclick = () => ($('#menu').hidden = true);
-// la voce del browser parte solo dopo il primo tocco: al primo tocco leggiamo la slide corrente
-document.addEventListener('pointerdown', (e) => {
-  unlockAudio();
-  if (autoVoice && SLIDES[cur].say && !e.target.closest('#stage [data-say], #stage .flip, #stage button, #bar')) say(SLIDES[cur].say);
-}, { once: true });
+// i suoni del browser partono solo dopo il primo tocco
+document.addEventListener('pointerdown', () => unlockAudio(), { once: true });
 
 const start = parseInt(location.hash.slice(1), 10);
 go(Number.isFinite(start) ? start - 1 : 0);

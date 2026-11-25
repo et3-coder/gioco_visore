@@ -21,6 +21,7 @@ Ogni figura diventa una frase che AIBI capisce come se fosse scritta (`js/pictur
 
 **Slide per la lezione** (`slide/`): presentazione interattiva da proiettare prima di giocare (IA e LLM, vibe coding,
 il gioco e le sue sfide, Parliamone, Gemini, quiz). Frecce per avanzare, tasto N per le note, F per lo schermo intero.
+Le slide non parlano: le note (tasto N) dicono a chi spiega cosa leggere ad alta voce in ogni slide.
 Online: `https://et3-coder.github.io/gioco_visore/vibe-coding/slide/`.
 
 Tasti nel gioco: frecce (o WASD) per muoversi, barra spaziatrice per saltare. Clicca sul gioco prima di usare la tastiera.

@@ -23,28 +23,32 @@ function clean(text) {
     .trim();
 }
 
-// La sintesi vocale del browser non sempre funziona (sul visore spesso mancano le voci italiane):
-// per questo i robot "parlano" anche con la loro voce da robot (bip e sillabe), che si sente sempre.
-const hasTTS = () => 'speechSynthesis' in window && speechSynthesis.getVoices().length > 0;
+// La voce vera si prova SEMPRE (il browser del visore spesso dice di non avere voci, ma parla lo stesso).
+// In più i robot hanno un po' di "voce da robot" (bip e sillabe), che diventa forte solo se la voce vera non parte.
+let speakId = 0;
 
 // pitch/rate permettono voci diverse per ogni robot (EMO più acuto, Loona ancora di più...)
 export function speak(text, { pitch = 1.25, rate = 0.95 } = {}) {
   if (!enabled) return;
   const t = clean(text);
-  const tts = hasTTS();
-  sfx.babble(t, pitch, tts ? 0.04 : 0.11); // con la voce vera i bip sono più piano
-  if (!tts) return;
+  const id = ++speakId;
+  sfx.babble(t, pitch, 0.04);
+  const fallback = () => { if (id === speakId) sfx.babble(t, pitch, 0.11); };
+  if (!('speechSynthesis' in window)) return fallback();
   try {
     speechSynthesis.cancel();
-    speechSynthesis.resume(); // Chrome a volte resta "in pausa"
     const u = new SpeechSynthesisUtterance(t);
     u.lang = 'it-IT';
     if (voice) u.voice = voice;
     u.rate = rate;
     u.pitch = pitch;
-    setTimeout(() => speechSynthesis.speak(u), 60); // subito dopo cancel() a volte la frase si perde
+    let started = false;
+    u.onstart = () => { started = true; };
+    u.onerror = (e) => { if (!started && e.error !== 'interrupted' && e.error !== 'canceled') fallback(); };
+    speechSynthesis.speak(u);
+    setTimeout(() => { if (!started && !speechSynthesis.speaking) fallback(); }, 1200);
   } catch (e) {
-    /* la voce non è disponibile: restano i bip e il testo */
+    fallback();
   }
 }
 
