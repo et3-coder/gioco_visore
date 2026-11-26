@@ -1,6 +1,6 @@
 // Slide interattive per spiegare ai bambini l'IA, gli LLM, il vibe coding e il gioco "Crea il tuo gioco con AIBI".
 // Pensate anche per chi NON sa leggere e ha poca attenzione: poche parole e tante immagini (le frasi le legge l'adulto),
-// attività brevi, pause in cui si fa il robot, stelline premio.
+// attività brevi, pause per disegnare, stelline premio.
 // Riusa i moduli del gioco (sfide, comprensione delle frasi, codice, pulsanti a immagini, suoni). Le slide non parlano.
 // Nessun dato salvato.
 import { CHALLENGES, DISCUSS, SHORT } from '../js/challenges.js';
@@ -126,46 +126,67 @@ function writeStory(mode) {
 
 const TURTLE = { quadrato: { n: 4, step: 200, turn: 90, ico: '⬜' }, triangolo: { n: 3, step: 240, turn: 120, ico: '🔺' }, stella: { n: 5, step: 260, turn: 144, ico: '⭐' } };
 
-// pause in cui il bambino fa il robot: l'adulto (o AIBI) dà i comandi, cioè il "codice"
-const PAUSES = [
-  [['🧍', 'In piedi!'], ['⬆️⬆️', 'Due passi avanti'], ['↪️', 'Gira a destra'], ['🦘', 'Salta!'], ['🤖👋', 'Saluta come un robot'], ['🪑', 'Seduto!']],
-  [['🧍', 'In piedi!'], ['🔁', 'Ripeti 4 volte:'], ['⬆️', 'Un passo avanti'], ['↪️', 'Gira a destra'], ['⬆️', 'Un passo avanti'], ['↪️', 'Gira a destra'], ['⬆️', 'Un passo avanti'], ['↪️', 'Gira a destra'], ['⬆️', 'Un passo avanti'], ['↪️', 'Gira a destra'], ['⬜', 'Hai fatto un quadrato!'], ['🪑', 'Seduto!']],
-  [['🙌', 'Braccia in alto!'], ['👏', 'Batti le mani tre volte'], ['🌀', 'Fai una giravolta'], ['🤖', 'Balla come un robot'], ['🧊', 'Statua! Fermo!'], ['🪑', 'Seduto!']],
-];
-function pauseSlide(k, title, intro, notes) {
-  const steps = PAUSES[k];
+// pause per disegnare: un foglio su cui il bambino disegna con il dito o con il mouse
+// (colori, matita grossa o fine, gomma, adesivi). Il disegno non viene salvato da nessuna parte.
+const COLORS = ['#1d2433', '#ff3b3b', '#ff9234', '#ffd23f', '#2fbf71', '#3b6bff', '#9b5cff', '#ff7ac8', '#8b5a2b'];
+function drawSlide(k, { sec, title, ico, stickers, intro, notes }) {
   return {
-    sec: k === 2 ? 'Dopo il gioco' : k === 1 ? 'Vibe coding' : 'IA e LLM', cls: 'sun',
-    html: () => `<div class="head"><p class="eyebrow">Pausa robot 🤖</p><h2>${title}</h2></div>
-      <div class="row grow" style="gap:40px">
-        <div class="cmd grow" id="cmd"><div class="ico-xl">🤖</div><p>Pronti?</p></div>
-        <div class="col" style="flex:none;width:360px;justify-content:center;align-items:center;gap:30px">
-          <button class="btn huge green" id="pGo">▶ Via!</button>
-          <button class="btn light" id="pStop">⏸ Ferma</button>
-          <div class="steps" id="pSteps">${steps.map(() => '<i></i>').join('')}</div>
+    sec, cls: 'sun',
+    html: () => `<div class="head"><p class="eyebrow">Pausa disegno 🖍️</p><h2>${ico} ${title}</h2></div>
+      <div class="row grow" style="gap:24px;min-height:0">
+        <div class="col draw-tools" style="flex:none;width:150px;gap:12px">
+          <div class="swatches">${COLORS.map((c, i) => `<button class="swatch${i === 1 ? ' on' : ''}" data-c="${c}" style="background:${c}"></button>`).join('')}</div>
+          <div class="row" style="gap:10px"><button class="tool on" data-w="12">✏️</button><button class="tool" data-w="34">🖌️</button></div>
+          <button class="tool" data-eraser="1">🧽</button>
         </div>
-      </div>`,
+        <div class="paper grow"><canvas class="sheet" width="1100" height="640"></canvas></div>
+        <div class="col" style="flex:none;width:150px;gap:12px;align-items:center">
+          ${stickers.map((s) => `<button class="tool sticker" data-s="${s}">${s}</button>`).join('')}
+          <button class="tool" data-clear="1" title="Cancella tutto">🗑️</button>
+        </div>
+      </div>
+      <div class="row" style="justify-content:center"><button class="btn green" data-done="1" style="font-size:34px">✅ Finito!</button></div>`,
     init(root) {
-      let run = 0;
-      const show = (i) => {
-        const [ico, txt] = steps[i];
-        const box = $('#cmd', root);
-        box.classList.remove('go'); void box.offsetWidth; box.classList.add('go');
-        box.innerHTML = `<div class="ico-xl">${ico}</div><p>${esc(txt)}</p>`;
-        $$('#pSteps i', root).forEach((d, j) => (d.className = j < i ? 'done' : j === i ? 'cur' : ''));
-        say(txt);
-        tone(660, 0.1, 0.06, 'square');
-      };
-      $('#pGo', root).onclick = async () => {
-        const my = ++run;
-        for (let i = 0; i < steps.length; i++) { if (my !== run || roots[cur] !== root) return; show(i); await wait(3300); }
-        if (my !== run) return;
-        $$('#pSteps i', root).forEach((d) => (d.className = 'done'));
-        $('#cmd', root).innerHTML = '<div class="ico-xl">🎉</div><p>Bravissimo robot!</p>';
-        say('Bravissimo robot! Hai eseguito tutto il programma!');
-        confetti(root); earn('pause' + k);
-      };
-      $('#pStop', root).onclick = () => { run++; $('#cmd', root).innerHTML = '<div class="ico-xl">⏸</div><p>Pausa</p>'; };
+      const cv = $('.sheet', root), g = cv.getContext('2d');
+      // il foglio ha le misure vere del riquadro, così i tratti non vengono deformati
+      cv.width = Math.round(cv.parentElement.clientWidth);
+      cv.height = Math.round(cv.parentElement.clientHeight);
+      let color = COLORS[1], width = 12, eraser = false, sticker = null, drawing = false, last = null, marks = 0;
+      const pos = (e) => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height]; };
+      const select = (btn, group) => { $$(group, root).forEach((b) => b.classList.toggle('on', b === btn)); };
+      g.lineCap = 'round'; g.lineJoin = 'round';
+      cv.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        cv.setPointerCapture(e.pointerId);
+        const [x, y] = pos(e);
+        if (sticker) {
+          g.globalCompositeOperation = 'source-over';
+          g.font = '110px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+          g.textAlign = 'center'; g.textBaseline = 'middle';
+          g.fillText(sticker, x, y);
+          beep(); marks++;
+          return;
+        }
+        drawing = true; last = [x, y];
+        g.globalCompositeOperation = eraser ? 'destination-out' : 'source-over';
+        g.fillStyle = color;
+        g.beginPath(); g.arc(x, y, (eraser ? 40 : width) / 2, 0, Math.PI * 2); g.fill();
+      });
+      cv.addEventListener('pointermove', (e) => {
+        if (!drawing) return;
+        const [x, y] = pos(e);
+        g.strokeStyle = color; g.lineWidth = eraser ? 40 : width;
+        g.beginPath(); g.moveTo(last[0], last[1]); g.lineTo(x, y); g.stroke();
+        last = [x, y]; marks++;
+      });
+      const stop = () => { drawing = false; };
+      cv.addEventListener('pointerup', stop); cv.addEventListener('pointercancel', stop);
+      $$('[data-c]', root).forEach((b) => (b.onclick = () => { color = b.dataset.c; eraser = false; sticker = null; select(b, '[data-c]'); $$('.sticker, [data-eraser]', root).forEach((x) => x.classList.remove('on')); beep(); }));
+      $$('[data-w]', root).forEach((b) => (b.onclick = () => { width = +b.dataset.w; eraser = false; sticker = null; select(b, '[data-w]'); $$('.sticker, [data-eraser]', root).forEach((x) => x.classList.remove('on')); beep(); }));
+      $('[data-eraser]', root).onclick = (e) => { eraser = true; sticker = null; $$('.sticker', root).forEach((x) => x.classList.remove('on')); e.currentTarget.classList.add('on'); beep(); };
+      $$('.sticker', root).forEach((b) => (b.onclick = () => { sticker = b.dataset.s; eraser = false; $('[data-eraser]', root).classList.remove('on'); select(b, '.sticker'); beep(); }));
+      $('[data-clear]', root).onclick = () => { g.clearRect(0, 0, cv.width, cv.height); marks = 0; sfx.bump(); };
+      $('[data-done]', root).onclick = () => { if (marks < 3) { sfx.bump(); return; } confetti(root); earn('draw' + k); };
     },
     say: intro,
     notes,
@@ -205,7 +226,7 @@ const SLIDES = [
     sec: 'Benvenuti',
     html: () => `<div class="head"><p class="eyebrow">Cosa facciamo</p><h2>Oggi facciamo…</h2></div>
       <div class="row grow" style="align-items:center">
-        ${[['🧠', 'Cos’è un’IA'], ['🤖', 'Fare il robot'], ['🪄', 'Il vibe coding'], ['🎮', 'Il gioco'], ['🏆', 'Il quiz']]
+        ${[['🧠', 'Cos’è un’IA'], ['🖍️', 'Disegnare'], ['🪄', 'Il vibe coding'], ['🎮', 'Il gioco'], ['🏆', 'Il quiz']]
           .map(([i, t]) => `<div class="card frag" data-say="${t}" style="flex:1;align-items:center;text-align:center;padding:40px 16px"><div class="ico-l">${i}</div><h3>${t}</h3></div>`).join('')}
       </div>`,
     say: 'Oggi scopriamo cos’è un’intelligenza artificiale, facciamo il robot, impariamo il vibe coding, giochiamo e alla fine facciamo un quiz!',
@@ -320,8 +341,9 @@ const SLIDES = [
     say: 'Tocca “sempre uguale” più volte: la storia non cambia. Poi tocca “con fantasia”: ogni volta è diversa!',
     notes: 'Per i più grandi: il “caso” si chiama temperatura. Per questo Gemini può rispondere in modo diverso alla stessa domanda.',
   },
-  pauseSlide(0, 'Tu sei il robot!', 'Pausa robot! Adesso tu sei il robot. Io ti do i comandi: ascolta e fai quello che dico!',
-    'Leggi tu ogni comando quando compare (3 secondi ciascuno): il bambino lo esegue. Collegamento: i comandi sono un programma, il bambino è il computer che lo esegue.'),
+  drawSlide(0, { sec: 'IA e LLM', title: 'Disegna il tuo robot!', ico: '🤖', stickers: ['⭐', '❤️', '⚡', '👀', '🔩'],
+    intro: 'Pausa disegno! Disegna il tuo robot: com’è fatto? Che colore ha? Cosa sa fare?',
+    notes: 'Pausa di 2-3 minuti. Il bambino disegna con il dito o con il mouse: a sinistra i colori, la matita fine ✏️ o grossa 🖌️, la gomma 🧽; a destra gli adesivi da toccare e poi mettere sul foglio, 🗑️ cancella tutto. Con ✅ Finito! arrivano coriandoli e una stellina. Poi chiedi: “Il tuo robot pensa? È vivo?”. Il disegno non viene salvato.' }),
   {
     sec: 'IA e LLM',
     html: () => `<div class="head"><p class="eyebrow">Attenzione</p><h2>Un’IA non è una persona</h2></div>
@@ -428,8 +450,9 @@ const SLIDES = [
     say: 'Il codice è una lista di comandi. Scegli una forma e tocca Via: la tartaruga fa esattamente quello che c’è scritto!',
     notes: 'Il bambino sceglie la forma (⬜ 🔺 ⭐) e tocca ▶ Via!. La riga gialla è il comando che la tartaruga sta eseguendo.',
   },
-  pauseSlide(1, 'Tu sei la tartaruga!', 'Adesso tu sei la tartaruga! Ascolta il programma e fai un quadrato con il tuo corpo.',
-    'Serve spazio per 1 passo in ogni direzione. È lo stesso programma del quadrato della slide prima: ripeti 4 volte avanti e gira a destra.'),
+  drawSlide(1, { sec: 'Vibe coding', title: 'Disegna il personaggio del tuo gioco!', ico: '🎮', stickers: ['⭐', '🪙', '☄️', '🌙', '🌳'],
+    intro: 'Pausa disegno! Disegna il personaggio del videogioco che creerai: un animale, un robot, un mostro simpatico… e dove vive!',
+    notes: 'Pausa di 2-3 minuti, che prepara il gioco: dopo il bambino cercherà tra le figure del gioco quella più simile al suo disegno. Il disegno non viene salvato.' }),
   {
     sec: 'Vibe coding',
     html: () => `<div class="head"><p class="eyebrow">Il vibe coding</p><h2>Dici a parole, l’IA scrive il codice</h2></div>
@@ -615,7 +638,9 @@ const SLIDES = [
       ? 'Confronta con le risposte date all’inizio: è cambiato qualcosa? Le risposte si dicono a voce, non vengono salvate.'
       : 'Si parla degli errori di AIBI: come se ne è accorto il bambino, chi deve controllare. Risposte a voce.',
   })),
-  pauseSlide(2, 'Festa dei robot!', 'Pausa robot! Facciamo la festa: ascolta e muoviti!', 'Pausa di movimento prima delle ultime attività.'),
+  drawSlide(2, { sec: 'Dopo il gioco', title: 'Disegna com’è per te un’intelligenza artificiale!', ico: '🧠', stickers: ['💬', '💡', '❤️', '❓', '⭐'],
+    intro: 'Pausa disegno! Disegna com’è per te un’intelligenza artificiale. Non c’è un modo giusto o sbagliato!',
+    notes: 'Utile per capire come il bambino percepisce l’IA: fatti raccontare il disegno (è una persona? un robot? una nuvola? è buona o cattiva?) e confrontalo con quello che pensava all’inizio. Se ti serve ricordarlo, fai una foto tu: il gioco non salva niente.' }),
   {
     sec: 'Dopo il gioco',
     html: () => `<div class="head"><p class="eyebrow">Proviamo Gemini</p><h2>Cosa chiediamo a Gemini?</h2></div>
